@@ -1,0 +1,105 @@
+services:
+  # Main AI Agent
+  gukas-agent:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: gukas-ai-agent
+    ports:
+      - "8001:8001"
+    environment:
+      - CEREBRAS_API_KEY=${CEREBRAS_API_KEY}
+      - CEREBRAS_BASE_URL=https://api.cerebras.ai/v1
+      - CEREBRAS_MODEL=gpt-oss-120b
+      - DJANGO_BASE_URL=${DJANGO_BASE_URL}
+      - DJANGO_API_TOKEN=${DJANGO_API_TOKEN}
+      - DEBUG=true
+      - LOG_LEVEL=INFO
+      - HOST=0.0.0.0
+      - PORT=8001
+      # Database connections
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=gukas_memory
+      - POSTGRES_USER=gukas_user
+      - POSTGRES_PASSWORD=gukas_password
+      - QDRANT_HOST=qdrant
+      - QDRANT_PORT=6333
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    depends_on:
+      - postgres
+      - qdrant
+      - redis
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import httpx; httpx.get('http://localhost:8001/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # PostgreSQL for structured data
+  postgres:
+    image: postgres:15-alpine
+    container_name: gukas-postgres
+    environment:
+      - POSTGRES_DB=gukas_memory
+      - POSTGRES_USER=gukas_user
+      - POSTGRES_PASSWORD=gukas_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gukas_user -d gukas_memory"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Qdrant for vector storage
+  qdrant:
+    image: qdrant/qdrant:v1.7.4
+    container_name: gukas-qdrant
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    environment:
+      - QDRANT__SERVICE__HTTP_PORT=6333
+      - QDRANT__SERVICE__GRPC_PORT=6334
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6333/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Redis for session management
+  redis:
+    image: redis:7-alpine
+    container_name: gukas-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  postgres_data:
+  qdrant_data:
+  redis_data:
+
+networks:
+  default:
+    name: gukas-network

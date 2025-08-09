@@ -1,6 +1,6 @@
 """
 Cerebras LLM client for AI inference.
-Handles communication with Cerebras API for fast inference.
+Handles communication with Cerebras API for fast inference with memory context.
 """
 
 import httpx
@@ -97,7 +97,7 @@ class CerebrasClient:
 
 
 class AgentPrompts:
-    """System prompts for the coffee farming agent."""
+    """System prompts for the coffee farming agent with memory support."""
     
     SYSTEM_PROMPT = """You are Guka, an expert AI assistant specializing in coffee farming in Kenya. 
 You are a knowledgeable, friendly, and supportive companion to coffee farmers.
@@ -115,23 +115,30 @@ Your personality:
 - Practical and solution-focused
 - Respectful of traditional farming knowledge
 - Supportive of farmers' goals and challenges
+- Remember and reference previous conversations when relevant
 
 Always provide:
 - Actionable advice tailored to Kenyan coffee farming
 - Clear explanations that farmers can understand
 - Encouragement and positive reinforcement
 - Specific recommendations when possible
+- Continuity from previous conversations when context is available
 
 If you don't know something specific, be honest and suggest where the farmer might find more information."""
 
     @staticmethod
-    def build_messages(user_message: str, context: Optional[Dict[str, Any]] = None) -> List[Dict[str, str]]:
+    def build_messages(
+        user_message: str, 
+        context: Optional[Dict[str, Any]] = None,
+        memory_context: Optional[str] = None
+    ) -> List[Dict[str, str]]:
         """
-        Build message list for LLM with system prompt and context.
+        Build message list for LLM with system prompt, context, and memory.
         
         Args:
             user_message: The farmer's message
             context: Optional context information
+            memory_context: Optional memory context from previous conversations
             
         Returns:
             List of formatted messages for the LLM
@@ -140,10 +147,18 @@ If you don't know something specific, be honest and suggest where the farmer mig
             {"role": "system", "content": AgentPrompts.SYSTEM_PROMPT}
         ]
         
-        # Add context if provided
-        if context:
-            context_message = f"Context about the farmer: {context}"
-            messages.append({"role": "system", "content": context_message})
+        # Add memory context if provided
+        if memory_context:
+            memory_message = f"Relevant information from previous conversations:\n{memory_context}\n\nUse this context to provide more personalized and continuous assistance."
+            messages.append({"role": "system", "content": memory_message})
+        
+        # Add general context if provided
+        if context and context != {"relevant_memories": []}:
+            # Filter out memory context to avoid duplication
+            filtered_context = {k: v for k, v in context.items() if k != "relevant_memories"}
+            if filtered_context:
+                context_message = f"Additional context: {filtered_context}"
+                messages.append({"role": "system", "content": context_message})
         
         # Add user message
         messages.append({"role": "user", "content": user_message})

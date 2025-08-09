@@ -35,6 +35,21 @@ class Settings(BaseSettings):
     temperature: float = 0.7
     request_timeout: int = 30
     
+    # Database Configuration
+    postgres_host: str = "localhost"
+    postgres_port: int = 5432
+    postgres_db: str = "gukas_memory"
+    postgres_user: str = "gukas_user"
+    postgres_password: str = "gukas_password"
+    
+    # Qdrant Configuration
+    qdrant_host: str = "localhost"
+    qdrant_port: int = 6333
+    
+    # Redis Configuration
+    redis_host: str = "localhost"
+    redis_port: int = 6379
+    
     class Config:
         env_file = ".env"
         case_sensitive = False
