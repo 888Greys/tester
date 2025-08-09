@@ -8,7 +8,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
+  IMAGE_NAME: 888greys/gukas-ai-agent
 
 jobs:
   test:
@@ -109,7 +109,7 @@ jobs:
         
         services:
           gukas-agent:
-            image: ghcr.io/${{ github.repository }}:latest
+            image: ghcr.io/888greys/gukas-ai-agent:latest
             container_name: gukas-ai-agent
             ports:
               - "8001:8001"
@@ -143,32 +143,43 @@ jobs:
             external: true
         EOF
         
-        # Create deployment script
+        # Around line 100-130, update the deploy.sh script:
         cat > deploy.sh << 'EOF'
         #!/bin/bash
         set -e
-        
+
         echo "🚀 Starting deployment of Gukas AI Agent..."
-        
-        # Create network if it doesn't exist
-        docker network create gukas-network 2>/dev/null || true
-        
+
+        # Stop existing container if running
+        echo "🛑 Stopping existing container..."
+        docker stop gukas-ai-agent 2>/dev/null || true
+        docker rm gukas-ai-agent 2>/dev/null || true
+
         # Pull latest image
         echo "📥 Pulling latest image..."
-        docker pull ghcr.io/${{ github.repository }}:latest
-        
-        # Stop and remove existing container
-        echo "🛑 Stopping existing container..."
-        docker-compose -f docker-compose.prod.yml down || true
-        
-        # Start new container
+        docker pull ghcr.io/888greys/gukas-ai-agent:latest
+
+        # Run new container
         echo "🚀 Starting new container..."
-        docker-compose -f docker-compose.prod.yml up -d
-        
+        docker run -d \
+          --name gukas-ai-agent \
+          -p 8001:8001 \
+          -e CEREBRAS_API_KEY="${CEREBRAS_API_KEY}" \
+          -e CEREBRAS_BASE_URL="https://api.cerebras.ai/v1" \
+          -e CEREBRAS_MODEL="gpt-oss-120b" \
+          -e DJANGO_BASE_URL="${DJANGO_BASE_URL}" \
+          -e DJANGO_API_TOKEN="${DJANGO_API_TOKEN}" \
+          -e DEBUG="false" \
+          -e LOG_LEVEL="INFO" \
+          -e HOST="0.0.0.0" \
+          -e PORT="8001" \
+          --restart unless-stopped \
+          ghcr.io/888greys/gukas-ai-agent:latest
+
         # Wait for health check
         echo "🏥 Waiting for health check..."
         sleep 30
-        
+
         # Verify deployment
         if curl -f http://localhost:8001/health; then
           echo "✅ Deployment successful!"
@@ -176,11 +187,11 @@ jobs:
           echo "❌ Deployment failed - health check failed"
           exit 1
         fi
-        
+
         # Cleanup old images
         echo "🧹 Cleaning up old images..."
         docker image prune -f
-        
+
         echo "🎉 Deployment completed successfully!"
         EOF
         
