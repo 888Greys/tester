@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  gukas-agent:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+      # Enable BuildKit features
+      x-bake:
+        target: local
+    image: gukas-ai-agent:local
+    container_name: gukas-ai-agent
+    ports:
+      - "8001:8001"
+    environment:
+      - CEREBRAS_API_KEY=${CEREBRAS_API_KEY}
+      - CEREBRAS_BASE_URL=${CEREBRAS_BASE_URL:-https://api.cerebras.ai/v1}
+      - CEREBRAS_MODEL=${CEREBRAS_MODEL:-gpt-oss-120B}
+      - DJANGO_BASE_URL=${DJANGO_BASE_URL}
+      - DJANGO_API_TOKEN=${DJANGO_API_TOKEN}
+      - DEBUG=${DEBUG:-true}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    env_file:
+      - .env
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import httpx; httpx.get('http://localhost:8001/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    volumes:
+      # Mount for development (optional - remove for production)
+      - ./app:/app/app:ro
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.gukas-agent.rule=Host(`agent.yourdomain.com`)"
+      - "traefik.http.routers.gukas-agent.tls=true"
+      - "traefik.http.routers.gukas-agent.tls.certresolver=letsencrypt"
+
+networks:
+  default:
+    name: gukas-network
