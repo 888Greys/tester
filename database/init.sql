@@ -41,7 +41,7 @@ CREATE TABLE conversation_messages (
     tokens_used INTEGER,
     model_used VARCHAR(100),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    metadata JSONB DEFAULT '{}',
+    message_metadata JSONB DEFAULT '{}',
     FOREIGN KEY (session_id) REFERENCES conversation_sessions(session_id) ON DELETE CASCADE,
     FOREIGN KEY (user_id) REFERENCES user_profiles(user_id) ON DELETE CASCADE
 );

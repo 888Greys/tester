@@ -1,0 +1,27 @@
+# Start from the working Phase 1 image
+FROM ghcr.io/888greys/gukas-ai-agent:latest
+
+# Switch to root to install packages
+USER root
+
+# Install memory system dependencies
+RUN pip install --no-cache-dir \
+    sqlalchemy[asyncio]==2.0.23 \
+    asyncpg==0.29.0 \
+    alembic==1.13.1 \
+    qdrant-client==1.7.0 \
+    sentence-transformers==2.2.2 \
+    redis==5.0.1 \
+    aioredis==2.0.1
+
+# Copy our memory system files
+COPY app/database.py /app/app/database.py
+
+# Update config.py to include database settings
+COPY app/config.py /app/app/config.py
+
+# Switch back to appuser
+USER appuser
+
+# Keep the same command
+CMD ["python", "main.py"]

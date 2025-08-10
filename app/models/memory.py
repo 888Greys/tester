@@ -4,6 +4,7 @@ Defines database models for user profiles, conversations, and memory storage.
 """
 
 from sqlalchemy import Column, String, Integer, Decimal, Text, DateTime, Boolean, ForeignKey, ARRAY
+from sqlalchemy.sql.sqltypes import Numeric
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -24,7 +25,7 @@ class UserProfile(Base):
     name = Column(String(255))
     phone = Column(String(50))
     location = Column(String(255))
-    farm_size_acres = Column(Decimal(10, 2))
+    farm_size_acres = Column(Numeric(10, 2))
     coffee_varieties = Column(ARRAY(Text))
     farming_experience_years = Column(Integer)
     preferred_language = Column(String(10), default='en')
@@ -74,7 +75,7 @@ class ConversationMessage(Base):
     tokens_used = Column(Integer)
     model_used = Column(String(100))
     created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
-    metadata = Column(JSONB, default={})
+    message_metadata = Column(JSONB, default={})
     
     # Relationships
     session = relationship("ConversationSession", back_populates="messages")

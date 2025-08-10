@@ -5,8 +5,10 @@ Handles PostgreSQL, Qdrant, and Redis connections.
 
 import asyncio
 from typing import AsyncGenerator, Optional
+from contextlib import asynccontextmanager
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy import text
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams, PointStruct
 import redis.asyncio as redis
@@ -143,8 +145,16 @@ class DatabaseManager:
                 logger.error(f"Failed to create collection {collection['name']}: {e}")
                 raise
     
+    @asynccontextmanager
     async def get_postgres_session(self) -> AsyncGenerator[AsyncSession, None]:
-        """Get PostgreSQL session."""
+        """
+        Get PostgreSQL session as an async context manager.
+        
+        Usage:
+            async with db_manager.get_postgres_session() as session:
+                # Use session here
+                result = await session.execute(query)
+        """
         if not self.postgres_session_factory:
             raise RuntimeError("PostgreSQL not initialized")
             
@@ -175,8 +185,8 @@ class DatabaseManager:
         
         # PostgreSQL health
         try:
-            async with self.postgres_session_factory() as session:
-                await session.execute("SELECT 1")
+            async with self.get_postgres_session() as session:
+                await session.execute(text("SELECT 1"))
             health["postgres"] = "connected"
         except Exception as e:
             health["postgres"] = f"error: {str(e)}"
