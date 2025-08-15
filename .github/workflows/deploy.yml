@@ -149,10 +149,14 @@ jobs:
 
         echo "🚀 Starting deployment of Gukas AI Agent..."
 
-        # Stop existing container if running
-        echo "🛑 Stopping existing container..."
-        docker stop gukas-ai-agent 2>/dev/null || true
-        docker rm gukas-ai-agent 2>/dev/null || true
+        # Stop ALL containers using port 8001
+        echo "🛑 Stopping existing containers on port 8001..."
+        docker ps --filter "publish=8001" --format "{{.Names}}" | xargs -r docker stop || true
+        docker ps -a --filter "publish=8001" --format "{{.Names}}" | xargs -r docker rm || true
+        
+        # Also stop by common names
+        docker stop gukas-ai-agent gukas-ai-agent-context-sync 2>/dev/null || true
+        docker rm gukas-ai-agent gukas-ai-agent-context-sync 2>/dev/null || true
 
         # Pull latest image
         echo "📥 Pulling latest image..."
