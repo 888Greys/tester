@@ -3,7 +3,7 @@ SQLAlchemy models for memory system.
 Defines database models for user profiles, conversations, and memory storage.
 """
 
-from sqlalchemy import Column, String, Integer, Decimal, Text, DateTime, Boolean, ForeignKey, ARRAY
+from sqlalchemy import Column, String, Integer, Text, DateTime, Boolean, ForeignKey, ARRAY
 from sqlalchemy.sql.sqltypes import Numeric
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship

@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     django_base_url: str
     django_api_token: Optional[str] = None
     
+    # Service Authentication
+    service_secret_key: str = "gukas-ai-agent-service-secret-2024-production-key"
+    
     # Request Configuration
     max_tokens: int = 1000
     temperature: float = 0.7

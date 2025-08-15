@@ -3,7 +3,7 @@ Pydantic models for request/response validation.
 Defines the API contract for the agent service.
 """
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 
@@ -16,8 +16,8 @@ class ChatRequest(BaseModel):
     session_id: Optional[str] = Field(None, description="Session identifier")
     context: Optional[Dict[str, Any]] = Field(None, description="Additional context")
     
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "message": "How is my coffee farm doing?",
                 "user_id": "farmer_123",
@@ -25,6 +25,7 @@ class ChatRequest(BaseModel):
                 "context": {"farm_id": 1}
             }
         }
+    )
 
 
 class ChatResponse(BaseModel):
@@ -36,8 +37,9 @@ class ChatResponse(BaseModel):
     model_used: str = Field(..., description="LLM model used")
     tokens_used: Optional[int] = Field(None, description="Tokens consumed")
     
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        protected_namespaces=(),
+        json_schema_extra={
             "example": {
                 "response": "Your coffee farm is looking great! Based on the latest data...",
                 "session_id": "session_456",
@@ -46,6 +48,7 @@ class ChatResponse(BaseModel):
                 "tokens_used": 150
             }
         }
+    )
 
 
 class HealthResponse(BaseModel):
@@ -57,11 +60,11 @@ class HealthResponse(BaseModel):
     timestamp: datetime = Field(default_factory=datetime.now, description="Health check timestamp")
     dependencies: Dict[str, str] = Field(default_factory=dict, description="Dependency status")
     
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "status": "healthy",
-                "app_name": "Gukas AI Agent",
+                "app_name": "Guka's AI Agent",
                 "version": "1.0.0",
                 "timestamp": "2024-08-09T09:30:00Z",
                 "dependencies": {
@@ -70,6 +73,7 @@ class HealthResponse(BaseModel):
                 }
             }
         }
+    )
 
 
 class ErrorResponse(BaseModel):
@@ -80,8 +84,8 @@ class ErrorResponse(BaseModel):
     timestamp: datetime = Field(default_factory=datetime.now, description="Error timestamp")
     request_id: Optional[str] = Field(None, description="Request identifier for tracking")
     
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "error": "Invalid request format",
                 "error_code": "VALIDATION_ERROR",
@@ -89,3 +93,4 @@ class ErrorResponse(BaseModel):
                 "request_id": "req_123456"
             }
         }
+    )
