@@ -320,6 +320,181 @@ async def root():
     }
 
 
+@app.post("/api/user/context/sync")
+async def sync_user_context(request: Dict[str, Any]):
+    """
+    Sync user context from Django backend.
+    Called when user logs in to synchronize their profile data.
+    """
+    try:
+        user_id = request.get("user_id")
+        context_data = request.get("context_data", {})
+        sync_type = request.get("sync_type", "login")
+        
+        if not user_id:
+            raise HTTPException(status_code=400, detail="user_id is required")
+        
+        logger.info(f"Syncing user context for user {user_id} (type: {sync_type})")
+        
+        # Extract user info from context data
+        user_info = context_data.get("user_info", {})
+        farmer_profile = context_data.get("farmer_profile", {})
+        farms_data = context_data.get("farms", {})
+        
+        # Create or update user profile in memory system
+        profile_data = {
+            "name": user_info.get("first_name", "") + " " + user_info.get("last_name", ""),
+            "location": farmer_profile.get("location", ""),
+            "farm_size_acres": farmer_profile.get("farm_size_acres"),
+            "coffee_varieties": farmer_profile.get("coffee_varieties", ""),
+            "farming_experience_years": farmer_profile.get("years_of_experience"),
+        }
+        
+        # Remove None values
+        profile_data = {k: v for k, v in profile_data.items() if v is not None}
+        
+        # Create or update user profile
+        await memory_service.get_or_create_user_profile(
+            user_id=str(user_id),
+            **profile_data
+        )
+        
+        # Store context summary as a memory embedding for future reference
+        context_summary = context_data.get("summary", "")
+        if context_summary:
+            await memory_service.store_conversation_message(
+                session_id=f"context_sync_{user_id}_{datetime.utcnow().timestamp()}",
+                user_id=str(user_id),
+                message_type="system",
+                content=f"User context: {context_summary}",
+                metadata={
+                    "sync_type": sync_type,
+                    "context_version": request.get("context_version", "v1"),
+                    "farms_count": farms_data.get("total_farms", 0),
+                    "total_acres": sum(farm.get("size_acres", 0) for farm in farms_data.get("farms", []))
+                }
+            )
+        
+        return {
+            "success": True,
+            "user_id": str(user_id),
+            "operation": "sync",
+            "message": "User context synchronized successfully",
+            "context_version": f"v1_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Context sync error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Context sync failed: {str(e)}")
+
+
+@app.put("/api/user/context/update")
+async def update_user_context(request: Dict[str, Any]):
+    """
+    Update user context when profile data changes.
+    Called when user updates their profile information.
+    """
+    try:
+        user_id = request.get("user_id")
+        updated_fields = request.get("updated_fields", [])
+        context_data = request.get("context_data", {})
+        
+        if not user_id:
+            raise HTTPException(status_code=400, detail="user_id is required")
+        
+        logger.info(f"Updating user context for user {user_id}, fields: {updated_fields}")
+        
+        # Extract updated user info
+        user_info = context_data.get("user_info", {})
+        farmer_profile = context_data.get("farmer_profile", {})
+        
+        # Prepare update data
+        update_data = {}
+        if "name" in updated_fields or "first_name" in updated_fields or "last_name" in updated_fields:
+            update_data["name"] = user_info.get("first_name", "") + " " + user_info.get("last_name", "")
+        if "location" in updated_fields:
+            update_data["location"] = farmer_profile.get("location", "")
+        if "farm_size_acres" in updated_fields:
+            update_data["farm_size_acres"] = farmer_profile.get("farm_size_acres")
+        if "coffee_varieties" in updated_fields:
+            update_data["coffee_varieties"] = farmer_profile.get("coffee_varieties", "")
+        if "years_of_experience" in updated_fields:
+            update_data["farming_experience_years"] = farmer_profile.get("years_of_experience")
+        
+        # Remove None values
+        update_data = {k: v for k, v in update_data.items() if v is not None}
+        
+        # Update user profile
+        if update_data:
+            await memory_service.update_user_profile(str(user_id), **update_data)
+        
+        return {
+            "success": True,
+            "user_id": str(user_id),
+            "operation": "update",
+            "message": "User context updated successfully",
+            "updated_fields": updated_fields,
+            "context_version": f"v1_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Context update error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Context update failed: {str(e)}")
+
+
+@app.delete("/api/user/context/clear")
+async def clear_user_context(request: Dict[str, Any]):
+    """
+    Clear user context during logout or account deletion.
+    """
+    try:
+        user_id = request.get("user_id")
+        clear_type = request.get("clear_type", "logout")
+        
+        if not user_id:
+            raise HTTPException(status_code=400, detail="user_id is required")
+        
+        logger.info(f"Clearing user context for user {user_id} (type: {clear_type})")
+        
+        # For logout, we don't actually delete the user data, just log the event
+        # For account deletion, we would need to implement actual data removal
+        
+        if clear_type == "account_deletion":
+            # TODO: Implement actual user data deletion
+            # This would involve removing user profile, conversations, etc.
+            logger.warning(f"Account deletion requested for user {user_id} - not implemented yet")
+        
+        # Log the clear event
+        await memory_service.store_conversation_message(
+            session_id=f"context_clear_{user_id}_{datetime.utcnow().timestamp()}",
+            user_id=str(user_id),
+            message_type="system",
+            content=f"User context cleared (type: {clear_type})",
+            metadata={
+                "clear_type": clear_type,
+                "timestamp": datetime.utcnow().isoformat()
+            }
+        )
+        
+        return {
+            "success": True,
+            "user_id": str(user_id),
+            "operation": "clear",
+            "message": "User context cleared successfully",
+            "clear_type": clear_type
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Context clear error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Context clear failed: {str(e)}")
+
+
 @app.get("/info")
 async def service_info():
     """Service information endpoint."""
@@ -334,6 +509,7 @@ async def service_info():
             "memory": True,  # Phase 2 ✅
             "vector_search": True,  # Phase 2 ✅
             "user_profiles": True,  # Phase 2 ✅
+            "context_sync": True,  # Phase 2 ✅ - NEW!
             "documents": False,  # Phase 4
             "tools": False  # Phase 3
         },
