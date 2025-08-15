@@ -162,17 +162,17 @@ jobs:
         echo "📥 Pulling latest image..."
         docker pull ghcr.io/888greys/gukas-ai-agent:latest
 
-        # Run new container
+        # Run new container with working server configuration
         echo "🚀 Starting new container..."
         docker run -d \
           --name gukas-ai-agent \
           -p 8001:8001 \
-          -e CEREBRAS_API_KEY="${CEREBRAS_API_KEY}" \
+          -e CEREBRAS_API_KEY="csk-hcphy33jwvtkxy2j363yddhnwnhj4pn6cv4ktmc9erxhvk39" \
           -e CEREBRAS_BASE_URL="https://api.cerebras.ai/v1" \
           -e CEREBRAS_MODEL="gpt-oss-120b" \
-          -e DJANGO_BASE_URL="${DJANGO_BASE_URL}" \
-          -e DJANGO_API_TOKEN="${DJANGO_API_TOKEN}" \
-          -e DEBUG="false" \
+          -e DJANGO_BASE_URL="https://gukasbackend.brand2d.tech" \
+          -e DJANGO_API_TOKEN="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzU0NzI1OTcwLCJpYXQiOjE3NTQ3MjIzNzAsImp0aSI6ImRmYzJmMWZkZjJhNTQwYWFhODYzYzU2YWM3YTc3NGQwOCIsInVzZXJfaWQiOjF9.sQJgV-1qbiuUiOehTCH81m3UDj9qaVVRaoj2GSxN6T0" \
+          -e DEBUG="true" \
           -e LOG_LEVEL="INFO" \
           -e HOST="0.0.0.0" \
           -e PORT="8001" \

@@ -193,11 +193,12 @@ GET /health
 {
   "status": "healthy",
   "app_name": "Gukas AI Agent",
-  "version": "2.0.0",
+  "version": "1.0.0",
+  "timestamp": "2025-01-15T10:30:00Z",
   "dependencies": {
     "cerebras_api": "connected",
     "postgres": "connected",
-    "qdrant": "connected",
+    "qdrant": "connected", 
     "redis": "connected",
     "django_backend": "connected"
   }
@@ -227,9 +228,7 @@ POST /chat
   "session_id": "session_456",
   "model_used": "gpt-oss-120b",
   "tokens_used": 932,
-  "timestamp": "2025-08-14T07:16:13.253217",
-  "memory_context_used": true,
-  "relevant_memories": 3
+  "timestamp": "2025-01-15T10:30:00.253217"
 }
 ```
 
@@ -237,19 +236,88 @@ POST /chat
 ```bash
 # Get user memory statistics
 GET /memory/user/{user_id}
+```
+**Response:**
+```json
+{
+  "user_id": "farmer_123",
+  "total_conversations": 15,
+  "total_messages": 89,
+  "last_activity": "2025-01-15T09:45:00Z",
+  "memory_stats": {
+    "stored_memories": 45,
+    "vector_embeddings": 45
+  }
+}
+```
 
+```bash
 # Get user conversation sessions
 GET /memory/sessions/{user_id}?limit=10
+```
+**Response:**
+```json
+{
+  "sessions": [
+    {
+      "session_id": "session_456",
+      "started_at": "2025-01-15T08:00:00Z",
+      "last_activity": "2025-01-15T09:45:00Z",
+      "message_count": 12,
+      "context": {"location": "Nyeri"}
+    }
+  ]
+}
+```
 
+```bash
 # Get conversation history
 GET /memory/conversation/{session_id}?limit=50
+```
+**Response:**
+```json
+{
+  "messages": [
+    {
+      "id": "msg_123",
+      "message_type": "user",
+      "content": "How should I prepare for harvest?",
+      "created_at": "2025-01-15T09:30:00Z",
+      "metadata": {}
+    },
+    {
+      "id": "msg_124", 
+      "message_type": "assistant",
+      "content": "For harvest preparation, focus on...",
+      "tokens_used": 245,
+      "model_used": "gpt-oss-120b",
+      "created_at": "2025-01-15T09:30:15Z",
+      "metadata": {}
+    }
+  ]
+}
+```
 
+```bash
 # Search memories semantically
 POST /memory/search
 {
   "user_id": "farmer_123",
   "query": "coffee pruning techniques",
   "limit": 5
+}
+```
+**Response:**
+```json
+{
+  "memories": [
+    {
+      "content": "Best time for pruning is after harvest...",
+      "similarity_score": 0.89,
+      "created_at": "2025-01-10T14:20:00Z",
+      "session_id": "session_445"
+    }
+  ]
 }
 ```
 
@@ -261,9 +329,10 @@ GET /info
 ```json
 {
   "app_name": "Gukas AI Agent",
-  "version": "2.0.0",
+  "version": "1.0.0",
   "debug_mode": false,
   "cerebras_model": "gpt-oss-120b",
+  "django_backend": "https://gukasbackend.brand2d.tech",
   "features": {
     "chat": true,
     "memory": true,
@@ -288,9 +357,9 @@ GET /
 ```json
 {
   "service": "Gukas AI Agent",
-  "version": "2.0.0",
+  "version": "1.0.0",
   "status": "running",
-  "timestamp": "2025-08-14T07:16:13.253217",
+  "timestamp": "2025-01-15T10:30:00.253217",
   "docs": "/docs",
   "features": {
     "memory": true,
@@ -338,9 +407,50 @@ Invoke-RestMethod -Uri "http://localhost:8001/memory/search" -Method Post -Body 
 Invoke-RestMethod -Uri "http://localhost:8001/memory/user/test_farmer"
 ```
 
+#### **Get User Sessions**
+```powershell
+Invoke-RestMethod -Uri "http://localhost:8001/memory/sessions/test_farmer?limit=10"
+```
+
 #### **Get Conversation History**
 ```powershell
 Invoke-RestMethod -Uri "http://localhost:8001/memory/conversation/test_session?limit=10"
+```
+
+#### **Service Information**
+```powershell
+Invoke-RestMethod -Uri "http://localhost:8001/info"
+```
+
+#### **cURL Testing Commands**
+
+```bash
+# Health check
+curl http://localhost:8001/health
+
+# Chat test
+curl -X POST http://localhost:8001/chat \
+  -H "Content-Type: application/json" \
+  -d '{
+    "message": "What should I do for my coffee plants today?",
+    "user_id": "test_farmer",
+    "session_id": "test_session"
+  }'
+
+# Memory search
+curl -X POST http://localhost:8001/memory/search \
+  -H "Content-Type: application/json" \
+  -d '{
+    "user_id": "test_farmer",
+    "query": "coffee pruning techniques",
+    "limit": 5
+  }'
+
+# Get user memory stats
+curl http://localhost:8001/memory/user/test_farmer
+
+# Get conversation history
+curl "http://localhost:8001/memory/conversation/test_session?limit=10"
 ```
 
 ## 🧪 **Testing**
