@@ -13,15 +13,23 @@ Gukas is an intelligent AI companion specifically designed for Kenyan coffee far
 
 - **🧠 Expert Coffee Farming Advice** - Specialized knowledge for Kenyan conditions
 - **⚡ Ultra-Fast Responses** - Powered by Cerebras `gpt-oss-120b` model
+- **💾 Memory & Context** - Remembers conversations and farmer details across sessions
+- **� Auto-Synco Integration** - Seamlessly receives farmer context from Django backend
 - **🌍 Local Context** - Understanding of Kenyan farming practices, varieties, and challenges
-- **💬 Natural Conversations** - Friendly, supportive farming companion
+- **💬 Natural Conversations** - Friendly, supportive farming companion with memory
 - **📊 Structured Guidance** - Actionable advice with checklists and recommendations
+- **🔍 Semantic Search** - Find relevant past conversations and advice
 
 ## 🚀 **Features**
 
-### **Phase 1 - Core Agent (COMPLETED ✅)**
+### **Phase 2 - Memory & Context System (COMPLETED ✅)**
 - ✅ **FastAPI Service** - High-performance async API
 - ✅ **Cerebras Integration** - Ultra-fast LLM inference with `gpt-oss-120b`
+- ✅ **Memory System** - PostgreSQL + Qdrant + Redis integration
+- ✅ **User Profiles** - Persistent user context and preferences
+- ✅ **Conversation History** - Full conversation tracking and retrieval
+- ✅ **Semantic Search** - Vector-based memory search with embeddings
+- ✅ **Auto-Sync Integration** - Receives farmer context from Django backend
 - ✅ **Coffee Farming Expertise** - Specialized prompts and knowledge
 - ✅ **Production Ready** - Docker containerization with BuildKit optimization
 - ✅ **Clean Architecture** - Modular, testable, maintainable code
@@ -29,10 +37,9 @@ Gukas is an intelligent AI companion specifically designed for Kenyan coffee far
 - ✅ **API Documentation** - Auto-generated Swagger/ReDoc documentation
 
 ### **Upcoming Phases**
-- **Phase 2**: Memory & Context System (PostgreSQL + Qdrant + Redis)
-- **Phase 3**: Smart Agent Intelligence (Django backend integration)
+- **Phase 3**: Smart Agent Intelligence (Enhanced Django integration & tools)
 - **Phase 4**: Document Intelligence (LlamaIndex RAG for farming documents)
-- **Phase 5**: Production Hardening (Monitoring, scaling, security)
+- **Phase 5**: Production Hardening (Advanced monitoring, scaling, security)
 
 ## 🏗️ **Architecture**
 
@@ -186,15 +193,18 @@ GET /health
 {
   "status": "healthy",
   "app_name": "Gukas AI Agent",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "dependencies": {
     "cerebras_api": "connected",
-    "django_backend": "not_configured"
+    "postgres": "connected",
+    "qdrant": "connected",
+    "redis": "connected",
+    "django_backend": "connected"
   }
 }
 ```
 
-#### **Chat with Agent**
+#### **Chat with Agent (Enhanced with Memory)**
 ```bash
 POST /chat
 ```
@@ -203,17 +213,43 @@ POST /chat
 {
   "message": "How should I prepare for coffee harvest?",
   "user_id": "farmer_123",
-  "session_id": "session_456"
+  "session_id": "session_456",
+  "context": {
+    "location": "Nyeri",
+    "farm_size": "2.5 acres"
+  }
 }
 ```
 **Response:**
 ```json
 {
-  "response": "Hello! I'm Guka, your coffee farming companion...",
+  "response": "Based on your 2.5-acre farm in Nyeri and our previous discussions about your SL28 variety...",
   "session_id": "session_456",
   "model_used": "gpt-oss-120b",
   "tokens_used": 932,
-  "timestamp": "2025-08-09T07:16:13.253217"
+  "timestamp": "2025-08-14T07:16:13.253217",
+  "memory_context_used": true,
+  "relevant_memories": 3
+}
+```
+
+#### **Memory Management**
+```bash
+# Get user memory statistics
+GET /memory/user/{user_id}
+
+# Get user conversation sessions
+GET /memory/sessions/{user_id}?limit=10
+
+# Get conversation history
+GET /memory/conversation/{session_id}?limit=50
+
+# Search memories semantically
+POST /memory/search
+{
+  "user_id": "farmer_123",
+  "query": "coffee pruning techniques",
+  "limit": 5
 }
 ```
 
@@ -221,10 +257,47 @@ POST /chat
 ```bash
 GET /info
 ```
+**Response:**
+```json
+{
+  "app_name": "Gukas AI Agent",
+  "version": "2.0.0",
+  "debug_mode": false,
+  "cerebras_model": "gpt-oss-120b",
+  "features": {
+    "chat": true,
+    "memory": true,
+    "vector_search": true,
+    "user_profiles": true,
+    "documents": false,
+    "tools": false
+  },
+  "databases": {
+    "postgres": "localhost:5432",
+    "qdrant": "localhost:6333",
+    "redis": "localhost:6379"
+  }
+}
+```
 
 #### **Root Endpoint**
 ```bash
 GET /
+```
+**Response:**
+```json
+{
+  "service": "Gukas AI Agent",
+  "version": "2.0.0",
+  "status": "running",
+  "timestamp": "2025-08-14T07:16:13.253217",
+  "docs": "/docs",
+  "features": {
+    "memory": true,
+    "vector_search": true,
+    "user_profiles": true
+  }
+}
 ```
 
 ### **PowerShell Testing Commands**
@@ -234,15 +307,40 @@ GET /
 Invoke-RestMethod -Uri "http://localhost:8001/health"
 ```
 
-#### **Chat Test**
+#### **Chat Test with Memory**
 ```powershell
 $chatRequest = @{
     message = "Hello, I am a coffee farmer in Kenya. Can you help me with my farm?"
     user_id = "test_farmer"
     session_id = "test_session"
+    context = @{
+        location = "Nyeri"
+        farm_size = "2.5 acres"
+    }
 } | ConvertTo-Json
 
 Invoke-RestMethod -Uri "http://localhost:8001/chat" -Method Post -Body $chatRequest -ContentType "application/json"
+```
+
+#### **Memory Search Test**
+```powershell
+$searchRequest = @{
+    user_id = "test_farmer"
+    query = "coffee pruning techniques"
+    limit = 5
+} | ConvertTo-Json
+
+Invoke-RestMethod -Uri "http://localhost:8001/memory/search" -Method Post -Body $searchRequest -ContentType "application/json"
+```
+
+#### **Get User Memory Stats**
+```powershell
+Invoke-RestMethod -Uri "http://localhost:8001/memory/user/test_farmer"
+```
+
+#### **Get Conversation History**
+```powershell
+Invoke-RestMethod -Uri "http://localhost:8001/memory/conversation/test_session?limit=10"
 ```
 
 ## 🧪 **Testing**
@@ -511,27 +609,40 @@ isort app/
 
 ## 📋 **Changelog**
 
-### **Phase 1 - v1.0.0 (Current)**
+### **Phase 2 - v2.0.0 (Current)**
 - ✅ Core FastAPI service with Cerebras integration
 - ✅ Coffee farming expertise and personality
+- ✅ **Memory System**: PostgreSQL + Qdrant + Redis integration
+- ✅ **User Profiles**: Persistent user context and preferences
+- ✅ **Conversation History**: Full conversation tracking and retrieval
+- ✅ **Semantic Search**: Vector-based memory search with embeddings
+- ✅ **Context Awareness**: AI remembers previous interactions
 - ✅ Docker containerization with BuildKit optimization
 - ✅ Comprehensive health checks and monitoring
 - ✅ Production-ready architecture and security
 
+### **Completed Phases**
+- **v1.0.0**: Basic AI agent with Cerebras integration
+- **v2.0.0**: Memory system and context awareness
+
 ### **Upcoming Releases**
-- **v1.1.0**: Memory system with PostgreSQL + Qdrant
-- **v1.2.0**: Django backend integration for farm data
-- **v1.3.0**: Document processing with LlamaIndex
-- **v1.4.0**: Advanced monitoring and scaling
+- **v2.1.0**: Django backend integration for farm data context
+- **v2.2.0**: Document processing with LlamaIndex RAG
+- **v2.3.0**: Advanced tools and function calling
+- **v2.4.0**: Production monitoring and scaling
 
 ## 🎯 **Success Metrics**
 
-### **Phase 1 Achievements**
-- [x] **Response Quality**: Expert-level coffee farming advice
-- [x] **Performance**: <2s response times with Cerebras
+### **Phase 2 Achievements**
+- [x] **Response Quality**: Expert-level coffee farming advice with memory context
+- [x] **Performance**: <2s response times with Cerebras + memory lookup
+- [x] **Memory System**: Full conversation history and semantic search
+- [x] **Context Awareness**: AI remembers user preferences and farm details
+- [x] **User Profiles**: Persistent user data across sessions
+- [x] **Vector Search**: Semantic memory retrieval with embeddings
 - [x] **Reliability**: Robust error handling and health checks
 - [x] **Usability**: Intuitive API with comprehensive documentation
-- [x] **Scalability**: Container-ready for cloud deployment
+- [x] **Scalability**: Multi-database architecture ready for cloud deployment
 
 ### **Production Readiness**
 - [x] **Security**: Non-root containers, input validation
