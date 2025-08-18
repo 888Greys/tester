@@ -95,6 +95,13 @@ jobs:
     - name: 📥 Checkout code
       uses: actions/checkout@v4
       
+    - name: 🕐 Log deployment start
+      run: |
+        echo "🚀 Starting deployment at $(date)"
+        echo "📍 Branch: ${{ github.ref }}"
+        echo "📝 Commit: ${{ github.sha }}"
+        echo "👤 Actor: ${{ github.actor }}"
+      
     - name: 🔑 Setup SSH
       uses: webfactory/ssh-agent@v0.8.0
       with:
@@ -147,25 +154,30 @@ jobs:
         #!/bin/bash
         set -e
 
-        echo "🚀 Starting deployment of Gukas AI Agent..."
+        echo "🚀 Starting deployment of Gukas AI Agent at $(date)"
+        echo "📍 Deployment ID: $(date +%Y%m%d-%H%M%S)"
 
         # Validate required environment variables
+        echo "🔍 Validating environment variables..."
         if [ -z "$CEREBRAS_API_KEY" ] || [ -z "$DJANGO_BASE_URL" ] || [ -z "$DJANGO_API_TOKEN" ]; then
-          echo "❌ Missing required environment variables"
+          echo "❌ Missing required environment variables at $(date)"
           exit 1
         fi
+        echo "✅ Environment variables validated at $(date)"
 
         # Stop existing containers
-        echo "🛑 Stopping existing containers..."
+        echo "🛑 Stopping existing containers at $(date)..."
         docker stop gukas-ai-agent 2>/dev/null || true
         docker rm gukas-ai-agent 2>/dev/null || true
+        echo "✅ Containers stopped at $(date)"
 
         # Pull latest image
-        echo "📥 Pulling latest image..."
+        echo "📥 Pulling latest image at $(date)..."
         docker pull ghcr.io/888greys/gukas-ai-agent:latest
+        echo "✅ Image pulled at $(date)"
 
         # Start new container
-        echo "🚀 Starting new container..."
+        echo "🚀 Starting new container at $(date)..."
         docker run -d \
           --name gukas-ai-agent \
           -p 8001:8001 \
@@ -181,22 +193,28 @@ jobs:
           --restart unless-stopped \
           ghcr.io/888greys/gukas-ai-agent:latest
 
+        echo "✅ Container started at $(date)"
+
         # Wait for service to start
-        echo "🏥 Waiting for service to start..."
+        echo "🏥 Waiting for service to start at $(date)..."
         sleep 30
 
         # Health check
-        echo "🔍 Running health check..."
+        echo "🔍 Running health check at $(date)..."
         for i in {1..5}; do
+          echo "🔍 Health check attempt $i at $(date)"
           if curl -f http://localhost:8001/health; then
-            echo "✅ Deployment successful!"
+            echo "✅ Deployment successful at $(date)!"
+            echo "🎉 Service is healthy and responding"
             exit 0
           fi
-          echo "Attempt $i failed, retrying in 10 seconds..."
+          echo "❌ Attempt $i failed at $(date), retrying in 10 seconds..."
           sleep 10
         done
 
-        echo "❌ Deployment failed - health check failed after 5 attempts"
+        echo "❌ Deployment failed - health check failed after 5 attempts at $(date)"
+        echo "📋 Container logs:"
+        docker logs gukas-ai-agent --tail 20
         exit 1
         EOF
         

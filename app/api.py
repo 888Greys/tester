@@ -88,6 +88,21 @@ async def global_exception_handler(request: Request, exc: Exception):
     )
 
 
+@app.get("/deployment-info")
+async def deployment_info():
+    """
+    Deployment information endpoint.
+    Returns current deployment timestamp and version info.
+    """
+    return {
+        "deployment_time": datetime.now().isoformat(),
+        "app_name": settings.app_name,
+        "version": settings.app_version,
+        "status": "deployed",
+        "message": "Gukas AI Agent is running successfully!"
+    }
+
+
 @app.get("/health", response_model=HealthResponse)
 async def health_check():
     """
@@ -117,7 +132,11 @@ async def health_check():
             status=status,
             app_name=settings.app_name,
             version=settings.app_version,
-            dependencies=dependencies
+            dependencies={
+                **dependencies,
+                "deployment_timestamp": datetime.now().isoformat(),
+                "uptime_check": "Service is running"
+            }
         )
         
     except Exception as e:
@@ -126,7 +145,10 @@ async def health_check():
             status="unhealthy",
             app_name=settings.app_name,
             version=settings.app_version,
-            dependencies={"error": str(e)}
+            dependencies={
+                "error": str(e),
+                "deployment_timestamp": datetime.now().isoformat()
+            }
         )
 
 
