@@ -208,30 +208,60 @@ GET /health
 ```
 **Note:** The health check now includes deployment timestamp and uptime verification for better monitoring and debugging.
 
-#### **Chat with Agent (Enhanced with Memory)**
+#### **Chat with Agent (Enhanced with Memory & Farmer Context)**
 ```bash
 POST /chat
 ```
-**Request:**
+**Request with Farmer Context (from Django Backend):**
 ```json
 {
   "message": "How should I prepare for coffee harvest?",
   "user_id": "farmer_123",
   "session_id": "session_456",
   "context": {
-    "location": "Nyeri",
-    "farm_size": "2.5 acres"
+    "context_available": true,
+    "user_info": {
+      "id": 1,
+      "username": "john_farmer",
+      "full_name": "John Doe"
+    },
+    "farmer_profile": {
+      "location": "Nyeri",
+      "years_of_experience": 10,
+      "certifications": "Organic, Fair Trade"
+    },
+    "farms": {
+      "total_farms": 1,
+      "farms": [
+        {
+          "name": "Green Valley Farm",
+          "size_acres": 2.5,
+          "crops": "SL28, SL34",
+          "elevation": 1800,
+          "plots": [
+            {
+              "plot_name": "Plot A",
+              "current_activity": "harvesting",
+              "status": "active"
+            }
+          ]
+        }
+      ]
+    },
+    "summary": "Farmer: John Doe. 10 years of farming experience. Owns 1 farm covering 2.5 acres in Nyeri. Grows SL28, SL34."
   }
 }
 ```
-**Response:**
+**Response with Context-Aware Intelligence:**
 ```json
 {
-  "response": "Based on your 2.5-acre farm in Nyeri and our previous discussions about your SL28 variety...",
+  "response": "Based on your 2.5-acre Green Valley Farm in Nyeri with SL28 and SL34 varieties, and your 10 years of experience, here's how to prepare for harvest season:\n\n1. **Timing**: With your elevation of 1800m, your main harvest should be starting now\n2. **Quality Focus**: Your SL28 variety can achieve premium AA grades - focus on selective picking\n3. **Processing**: Given your organic certification, maintain strict processing standards...",
   "session_id": "session_456",
   "model_used": "gpt-oss-120b",
   "tokens_used": 932,
-  "timestamp": "2025-01-15T10:30:00.253217"
+  "timestamp": "2025-01-15T10:30:00.253217",
+  "context_used": true,
+  "farmer_context_applied": true
 }
 ```
 
@@ -324,70 +354,90 @@ POST /memory/search
 }
 ```
 
-#### **Context Synchronization (Django Integration)**
-```bash
-# Sync user context from Django backend
-POST /api/user/context/sync
+#### **Context Integration (Django Backend Integration)**
+The AI agent now receives comprehensive farmer context automatically from the Django backend through the chat endpoint. This includes:
+
+**Automatic Context Flow:**
+```
+Django Backend → AI Agent Chat Endpoint
+```
+
+**Context Data Structure (Received from Django):**
+```json
 {
-  "user_id": "farmer_123",
-  "context_data": {
-    "user_info": {
-      "first_name": "John",
-      "last_name": "Doe"
-    },
-    "farmer_profile": {
-      "location": "Nyeri",
-      "farm_size_acres": 2.5,
-      "coffee_varieties": "SL28, SL34",
-      "years_of_experience": 10
-    },
-    "farms": {
-      "total_farms": 1,
-      "farms": [
-        {
-          "name": "Green Valley Farm",
-          "size_acres": 2.5,
-          "location": "Nyeri"
-        }
-      ]
-    },
-    "summary": "Experienced coffee farmer with 2.5 acres in Nyeri"
+  "context_available": true,
+  "user_info": {
+    "id": 1,
+    "username": "john_farmer",
+    "full_name": "John Doe",
+    "role": "farmer"
   },
-  "sync_type": "login"
+  "farmer_profile": {
+    "phone": "+254712345678",
+    "location": "Nyeri",
+    "years_of_experience": 10,
+    "certifications": "Organic, Fair Trade"
+  },
+  "farms": {
+    "total_farms": 1,
+    "farms": [
+      {
+        "name": "Green Valley Farm",
+        "size_acres": 2.5,
+        "location": "Nyeri",
+        "elevation": 1800,
+        "crops": "SL28, SL34",
+        "plots": [
+          {
+            "plot_name": "Plot A",
+            "size_acres": 1.2,
+            "current_activity": "harvesting",
+            "status": "active"
+          }
+        ],
+        "recent_batches": [
+          {
+            "batch_number": "GV001",
+            "batch_status": "processing",
+            "quantity_kg": 150,
+            "quality_grade": "AA"
+          }
+        ]
+      }
+    ]
+  },
+  "recent_activities": {
+    "recent_activities": [
+      {
+        "type": "coffee_batch",
+        "description": "Coffee batch GV001 - processing",
+        "date": "2025-01-15T08:00:00Z",
+        "farm": "Green Valley Farm"
+      }
+    ]
+  },
+  "summary": "Farmer: John Doe. 10 years of farming experience. Owns 1 farm covering 2.5 acres in Nyeri. Grows SL28, SL34. Certifications: Organic, Fair Trade."
 }
+```
+
+**Smart Context Usage:**
+- **General Queries**: "Hi" → Brief greeting without context
+- **Farming Queries**: "How many farms do I own?" → Uses full farmer context for detailed response
+- **Context-Aware Responses**: AI intelligently determines when farmer context is relevant
+
+#### **Deployment Information**
+```bash
+# Get deployment information
+GET /deployment-info
 ```
 **Response:**
 ```json
 {
-  "success": true,
-  "user_id": "farmer_123",
-  "operation": "sync",
-  "message": "User context synchronized successfully",
-  "context_version": "v1_20250115_103000"
-}
-```
-
-```bash
-# Update user context when profile changes
-PUT /api/user/context/update
-{
-  "user_id": "farmer_123",
-  "updated_fields": ["location", "farm_size_acres"],
-  "context_data": {
-    "farmer_profile": {
-      "location": "Kiambu",
-      "farm_size_acres": 3.0
-    }
-  }
-}
-```
-
-```bash
-# Clear user context (logout/deletion)
-DELETE /api/user/context/clear
-{
-  "user_id": "farmer_123",
-  "clear_type": "logout"
+  "deployment_time": "2025-01-15T10:30:00.253217",
+  "app_name": "Gukas AI Agent",
+  "version": "1.0.0",
+  "status": "deployed",
+  "message": "Gukas AI Agent is running successfully!"
 }
 ```
 
@@ -447,6 +497,7 @@ GET /
 - `GET /health` - Comprehensive health check with dependencies
 - `POST /chat` - Main chat endpoint with memory and context
 - `GET /info` - Detailed service information and feature flags
+- `GET /deployment-info` - Deployment information and status
 
 #### **Memory System Endpoints**
 - `GET /memory/user/{user_id}` - Get user memory statistics
@@ -471,17 +522,38 @@ GET /
 Invoke-RestMethod -Uri "http://localhost:8001/health"
 ```
 
-#### **Chat Test with Memory**
+#### **Chat Test with Farmer Context**
 ```powershell
 $chatRequest = @{
-    message = "Hello, I am a coffee farmer in Kenya. Can you help me with my farm?"
+    message = "How should I prepare for harvest season?"
     user_id = "test_farmer"
     session_id = "test_session"
     context = @{
-        location = "Nyeri"
-        farm_size = "2.5 acres"
+        context_available = $true
+        user_info = @{
+            id = 1
+            username = "john_farmer"
+            full_name = "John Doe"
+        }
+        farmer_profile = @{
+            location = "Nyeri"
+            years_of_experience = 10
+            certifications = "Organic, Fair Trade"
+        }
+        farms = @{
+            total_farms = 1
+            farms = @(
+                @{
+                    name = "Green Valley Farm"
+                    size_acres = 2.5
+                    crops = "SL28, SL34"
+                    elevation = 1800
+                }
+            )
+        }
+        summary = "Farmer: John Doe. 10 years of farming experience. Owns 1 farm covering 2.5 acres in Nyeri."
     }
-} | ConvertTo-Json
+} | ConvertTo-Json -Depth 4
 
 Invoke-RestMethod -Uri "http://localhost:8001/chat" -Method Post -Body $chatRequest -ContentType "application/json"
 ```
@@ -512,6 +584,34 @@ Invoke-RestMethod -Uri "http://localhost:8001/memory/sessions/test_farmer?limit=
 Invoke-RestMethod -Uri "http://localhost:8001/memory/conversation/test_session?limit=10"
 ```
 
+#### **Get Deployment Information**
+```powershell
+Invoke-RestMethod -Uri "http://localhost:8001/deployment-info"
+```
+
+#### **Context Sync Test**
+```powershell
+$contextSyncRequest = @{
+    user_id = "test_farmer"
+    context_data = @{
+        user_info = @{
+            first_name = "John"
+            last_name = "Doe"
+        }
+        farmer_profile = @{
+            location = "Nyeri"
+            farm_size_acres = 2.5
+            coffee_varieties = "SL28, SL34"
+            years_of_experience = 10
+        }
+        summary = "Experienced coffee farmer with 2.5 acres in Nyeri"
+    }
+    sync_type = "login"
+} | ConvertTo-Json -Depth 4
+
+Invoke-RestMethod -Uri "http://localhost:8001/api/user/context/sync" -Method Post -Body $contextSyncRequest -ContentType "application/json"
+```
+
 #### **Service Information**
 ```powershell
 Invoke-RestMethod -Uri "http://localhost:8001/info"
@@ -523,13 +623,36 @@ Invoke-RestMethod -Uri "http://localhost:8001/info"
 # Health check
 curl http://localhost:8001/health
 
-# Chat test
+# Chat test with farmer context
 curl -X POST http://localhost:8001/chat \
   -H "Content-Type: application/json" \
   -d '{
     "message": "What should I do for my coffee plants today?",
     "user_id": "test_farmer",
-    "session_id": "test_session"
+    "session_id": "test_session",
+    "context": {
+      "context_available": true,
+      "user_info": {
+        "id": 1,
+        "username": "john_farmer",
+        "full_name": "John Doe"
+      },
+      "farmer_profile": {
+        "location": "Nyeri",
+        "years_of_experience": 10
+      },
+      "farms": {
+        "total_farms": 1,
+        "farms": [
+          {
+            "name": "Green Valley Farm",
+            "size_acres": 2.5,
+            "crops": "SL28, SL34"
+          }
+        ]
+      },
+      "summary": "Experienced coffee farmer with 2.5 acres in Nyeri"
+    }
   }'
 
 # Memory search
@@ -546,6 +669,30 @@ curl http://localhost:8001/memory/user/test_farmer
 
 # Get conversation history
 curl "http://localhost:8001/memory/conversation/test_session?limit=10"
+
+# Get deployment information
+curl http://localhost:8001/deployment-info
+
+# Context sync test
+curl -X POST http://localhost:8001/api/user/context/sync \
+  -H "Content-Type: application/json" \
+  -d '{
+    "user_id": "test_farmer",
+    "context_data": {
+      "user_info": {
+        "first_name": "John",
+        "last_name": "Doe"
+      },
+      "farmer_profile": {
+        "location": "Nyeri",
+        "farm_size_acres": 2.5,
+        "coffee_varieties": "SL28, SL34",
+        "years_of_experience": 10
+      },
+      "summary": "Experienced coffee farmer with 2.5 acres in Nyeri"
+    },
+    "sync_type": "login"
+  }'
 ```
 
 ## 🧪 **Testing**
@@ -822,8 +969,12 @@ isort app/
 - ✅ **Conversation History**: Full conversation tracking and retrieval
 - ✅ **Semantic Search**: Vector-based memory search with embeddings
 - ✅ **Context Awareness**: AI remembers previous interactions
-- ✅ **Context Sync Integration**: Automatic user context synchronization from Django backend
+- ✅ **🌾 Farmer Context Integration**: Automatic comprehensive farmer context from Django backend
+- ✅ **🧠 Smart Context Detection**: AI intelligently determines when to use farmer context
+- ✅ **📊 Real-time Farm Data**: Access to live farm, plot, and harvest information
 - ✅ **Enhanced Health Checks**: Deployment timestamp and uptime verification
+- ✅ **Deployment Info Endpoint**: Real-time deployment status and information
+- ✅ **String User ID Support**: Proper handling of user_id as string from Django backend
 - ✅ Docker containerization with BuildKit optimization
 - ✅ Comprehensive health checks and monitoring
 - ✅ Production-ready architecture and security
@@ -841,10 +992,13 @@ isort app/
 ## 🎯 **Success Metrics**
 
 ### **Phase 2 Achievements**
-- [x] **Response Quality**: Expert-level coffee farming advice with memory context
-- [x] **Performance**: <2s response times with Cerebras + memory lookup
+- [x] **Response Quality**: Expert-level coffee farming advice with memory context and real farm data
+- [x] **Performance**: <2s response times with Cerebras + memory lookup + context integration
 - [x] **Memory System**: Full conversation history and semantic search
 - [x] **Context Awareness**: AI remembers user preferences and farm details
+- [x] **🌾 Farmer Context Integration**: Automatic access to comprehensive farmer profiles and farm data
+- [x] **🧠 Smart Context Detection**: AI intelligently applies context only when relevant
+- [x] **📊 Real-time Data Access**: Live integration with Django backend for current farm status
 - [x] **User Profiles**: Persistent user data across sessions
 - [x] **Vector Search**: Semantic memory retrieval with embeddings
 - [x] **Reliability**: Robust error handling and health checks
