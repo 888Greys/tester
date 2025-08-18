@@ -8,7 +8,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: 888greys/gukas-ai-agent
+  IMAGE_NAME: brand-design-development/guka-agent
 
 jobs:
   test:
@@ -115,7 +115,7 @@ jobs:
         
         services:
           gukas-agent:
-            image: ghcr.io/888greys/gukas-ai-agent:latest
+            image: ghcr.io/brand-design-development/guka-agent:latest
             container_name: gukas-ai-agent
             ports:
               - "8001:8001"
@@ -173,7 +173,7 @@ jobs:
 
         # Pull latest image
         echo "📥 Pulling latest image at $(date)..."
-        docker pull ghcr.io/888greys/gukas-ai-agent:latest
+        docker pull ghcr.io/brand-design-development/guka-agent:latest
         echo "✅ Image pulled at $(date)"
 
         # Start new container
@@ -191,7 +191,7 @@ jobs:
           -e HOST="0.0.0.0" \
           -e PORT="8001" \
           --restart unless-stopped \
-          ghcr.io/888greys/gukas-ai-agent:latest
+          ghcr.io/brand-design-development/guka-agent:latest
 
         echo "✅ Container started at $(date)"
 

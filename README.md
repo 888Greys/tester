@@ -45,8 +45,9 @@ Gukas is an intelligent AI companion specifically designed for Kenyan coffee far
 
 ```
 ┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   Farmer Chat   │───▶│   FastAPI Agent  │───▶│  Cerebras LLM   │
-│   Interface     │    │   (Gukas Agent)  │    │ (gpt-oss-120b)  │
+│  React Frontend │───▶│   Django Backend │───▶│  FastAPI Agent  │───▶│  Cerebras LLM   │
+│ (gukas-frontend)│    │ (gukas-backend)  │    │ (guka-ai-agent) │    │ (gpt-oss-120b)  │
+│    Port 3000    │    │    Port 8000     │    │    Port 8001    │    │                 │
 └─────────────────┘    └──────────────────┘    └────────���────────┘
                                 │
                                 ▼
@@ -184,7 +185,7 @@ docker buildx bake dev
 
 ### **Core Endpoints**
 
-#### **Health Check**
+#### **Health Check (Enhanced)**
 ```bash
 GET /health
 ```
@@ -194,16 +195,18 @@ GET /health
   "status": "healthy",
   "app_name": "Gukas AI Agent",
   "version": "1.0.0",
-  "timestamp": "2025-01-15T10:30:00Z",
   "dependencies": {
     "cerebras_api": "connected",
     "postgres": "connected",
     "qdrant": "connected", 
     "redis": "connected",
-    "django_backend": "connected"
+    "django_backend": "connected",
+    "deployment_timestamp": "2025-01-15T10:30:00.253217",
+    "uptime_check": "Service is running"
   }
 }
 ```
+**Note:** The health check now includes deployment timestamp and uptime verification for better monitoring and debugging.
 
 #### **Chat with Agent (Enhanced with Memory)**
 ```bash
@@ -321,6 +324,73 @@ POST /memory/search
 }
 ```
 
+#### **Context Synchronization (Django Integration)**
+```bash
+# Sync user context from Django backend
+POST /api/user/context/sync
+{
+  "user_id": "farmer_123",
+  "context_data": {
+    "user_info": {
+      "first_name": "John",
+      "last_name": "Doe"
+    },
+    "farmer_profile": {
+      "location": "Nyeri",
+      "farm_size_acres": 2.5,
+      "coffee_varieties": "SL28, SL34",
+      "years_of_experience": 10
+    },
+    "farms": {
+      "total_farms": 1,
+      "farms": [
+        {
+          "name": "Green Valley Farm",
+          "size_acres": 2.5,
+          "location": "Nyeri"
+        }
+      ]
+    },
+    "summary": "Experienced coffee farmer with 2.5 acres in Nyeri"
+  },
+  "sync_type": "login"
+}
+```
+**Response:**
+```json
+{
+  "success": true,
+  "user_id": "farmer_123",
+  "operation": "sync",
+  "message": "User context synchronized successfully",
+  "context_version": "v1_20250115_103000"
+}
+```
+
+```bash
+# Update user context when profile changes
+PUT /api/user/context/update
+{
+  "user_id": "farmer_123",
+  "updated_fields": ["location", "farm_size_acres"],
+  "context_data": {
+    "farmer_profile": {
+      "location": "Kiambu",
+      "farm_size_acres": 3.0
+    }
+  }
+}
+```
+
+```bash
+# Clear user context (logout/deletion)
+DELETE /api/user/context/clear
+{
+  "user_id": "farmer_123",
+  "clear_type": "logout"
+}
+```
+
 #### **Service Information**
 ```bash
 GET /info
@@ -338,6 +408,7 @@ GET /info
     "memory": true,
     "vector_search": true,
     "user_profiles": true,
+    "context_sync": true,
     "documents": false,
     "tools": false
   },
@@ -368,6 +439,30 @@ GET /
   }
 }
 ```
+
+### **Complete Endpoint Reference**
+
+#### **Core AI Agent Endpoints**
+- `GET /` - Root endpoint with service information
+- `GET /health` - Comprehensive health check with dependencies
+- `POST /chat` - Main chat endpoint with memory and context
+- `GET /info` - Detailed service information and feature flags
+
+#### **Memory System Endpoints**
+- `GET /memory/user/{user_id}` - Get user memory statistics
+- `GET /memory/sessions/{user_id}` - Get user conversation sessions
+- `GET /memory/conversation/{session_id}` - Get conversation history
+- `POST /memory/search` - Semantic search through user memories
+
+#### **Context Synchronization Endpoints (Django Integration)**
+- `POST /api/user/context/sync` - Sync user context from Django backend
+- `PUT /api/user/context/update` - Update user context when profile changes
+- `DELETE /api/user/context/clear` - Clear user context (logout/deletion)
+
+#### **API Documentation**
+- `GET /docs` - Swagger UI (debug mode only)
+- `GET /redoc` - ReDoc documentation (debug mode only)
+- `GET /openapi.json` - OpenAPI schema
 
 ### **PowerShell Testing Commands**
 
@@ -719,7 +814,7 @@ isort app/
 
 ## 📋 **Changelog**
 
-### **Phase 2 - v2.0.0 (Current)**
+### **Phase 2 - v2.0.0 (Current - Latest Update)**
 - ✅ Core FastAPI service with Cerebras integration
 - ✅ Coffee farming expertise and personality
 - ✅ **Memory System**: PostgreSQL + Qdrant + Redis integration
@@ -727,6 +822,8 @@ isort app/
 - ✅ **Conversation History**: Full conversation tracking and retrieval
 - ✅ **Semantic Search**: Vector-based memory search with embeddings
 - ✅ **Context Awareness**: AI remembers previous interactions
+- ✅ **Context Sync Integration**: Automatic user context synchronization from Django backend
+- ✅ **Enhanced Health Checks**: Deployment timestamp and uptime verification
 - ✅ Docker containerization with BuildKit optimization
 - ✅ Comprehensive health checks and monitoring
 - ✅ Production-ready architecture and security
