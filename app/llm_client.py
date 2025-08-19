@@ -146,16 +146,18 @@ Remember: You are talking to ONE farmer about THEIR specific farm and challenges
         user_message: str, 
         context: Optional[Dict[str, Any]] = None,
         memory_context: Optional[str] = None,
-        document_context: Optional[str] = None
+        document_context: Optional[str] = None,
+        weather_context: Optional[str] = None
     ) -> List[Dict[str, str]]:
         """
-        Build message list for LLM with system prompt, context, memory, and documents.
+        Build message list for LLM with system prompt, context, memory, documents, and weather.
         
         Args:
             user_message: The farmer's message
             context: Optional context information
             memory_context: Optional memory context from previous conversations
             document_context: Optional document context from knowledge base
+            weather_context: Optional current weather and forecast information
             
         Returns:
             List of formatted messages for the LLM
@@ -164,7 +166,12 @@ Remember: You are talking to ONE farmer about THEIR specific farm and challenges
             {"role": "system", "content": AgentPrompts.SYSTEM_PROMPT}
         ]
         
-        # Add document context if provided (highest priority)
+        # Add weather context if provided (very relevant for farming decisions)
+        if weather_context:
+            weather_message = f"Current weather information for farming decisions:\n{weather_context}\n\nConsider this weather data when providing farming advice, especially for timing of activities."
+            messages.append({"role": "system", "content": weather_message})
+        
+        # Add document context if provided (highest priority for factual information)
         if document_context:
             doc_message = f"Relevant information from the coffee farming knowledge base:\n{document_context}\n\nUse this information to provide accurate, evidence-based advice."
             messages.append({"role": "system", "content": doc_message})

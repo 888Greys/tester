@@ -23,7 +23,9 @@ class AgentService:
         self.llm_client = cerebras_client
         # Import here to avoid circular imports
         from app.services.document_service import document_service
+        from app.services.weather_service import weather_service
         self.document_service = document_service
+        self.weather_service = weather_service
         
     async def process_chat_message(self, request: ChatRequest) -> ChatResponse:
         """
@@ -50,15 +52,19 @@ class AgentService:
             # Search relevant documents for the user's question
             document_context = await self._search_relevant_documents(request.message, request.user_id)
             
-            # Build enhanced context with memory and documents
+            # Get weather context if user has location data
+            weather_context = await self._get_weather_context(request.context, request.message)
+            
+            # Build enhanced context with memory, documents, and weather
             memory_context = self._build_memory_context(relevant_memories)
             
-            # Build messages for LLM with memory and document context
+            # Build messages for LLM with memory, document, and weather context
             messages = AgentPrompts.build_messages(
                 user_message=request.message,
                 context=request.context,
                 memory_context=memory_context,
-                document_context=document_context
+                document_context=document_context,
+                weather_context=weather_context
             )
             
             # Generate response from Cerebras
@@ -144,6 +150,73 @@ class AgentService:
             
         except Exception as e:
             logger.error(f"Error searching documents: {str(e)}")
+            return ""
+    
+    async def _get_weather_context(self, context: Optional[Dict[str, Any]], message: str) -> str:
+        """
+        Get weather context if relevant to the user's question and location is available.
+        
+        Args:
+            context: User context that might contain location
+            message: User's message to check if weather-related
+            
+        Returns:
+            Formatted weather context string
+        """
+        try:
+            # Check if the message is weather-related
+            weather_keywords = [
+                "weather", "rain", "dry", "wet", "season", "temperature", "humidity",
+                "drought", "flooding", "planting", "harvest", "spray", "irrigation",
+                "when to", "timing", "climate", "wind", "sunshine"
+            ]
+            
+            message_lower = message.lower()
+            is_weather_related = any(keyword in message_lower for keyword in weather_keywords)
+            
+            if not is_weather_related:
+                return ""
+            
+            # Default to common Kenya coffee regions if no specific location
+            # Nyeri coordinates (major coffee region)
+            latitude = -0.4167
+            longitude = 36.95
+            
+            # Try to get location from context if available
+            if context:
+                user_location = context.get("location") or context.get("farm_location")
+                if user_location:
+                    # Parse coordinates if provided (future enhancement)
+                    pass
+            
+            # Get current weather and short forecast
+            current_weather = await self.weather_service.get_current_weather(latitude, longitude)
+            forecast = await self.weather_service.get_forecast(latitude, longitude, days=3)
+            
+            if not current_weather:
+                return ""
+            
+            weather_parts = []
+            weather_parts.append("Current weather conditions for your farming area:")
+            weather_parts.append(f"• Temperature: {current_weather.temperature:.1f}°C")
+            weather_parts.append(f"• Humidity: {current_weather.humidity:.0f}%")
+            weather_parts.append(f"• Condition: {current_weather.condition}")
+            
+            if current_weather.precipitation > 0:
+                weather_parts.append(f"• Current rainfall: {current_weather.precipitation:.1f}mm")
+            
+            if forecast:
+                weather_parts.append(f"\nNext 3 days outlook:")
+                for day in forecast[:3]:
+                    weather_parts.append(
+                        f"• {day.date}: {day.temperature_min:.0f}-{day.temperature_max:.0f}°C, "
+                        f"{day.precipitation:.1f}mm rain ({day.precipitation_probability:.0f}% chance)"
+                    )
+            
+            return "\n".join(weather_parts)
+            
+        except Exception as e:
+            logger.error(f"Error getting weather context: {str(e)}")
             return ""
     
     async def health_check(self) -> Dict[str, str]:

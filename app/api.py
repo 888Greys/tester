@@ -24,6 +24,7 @@ from app.database import db_manager
 from app.services.embedding import vector_memory_service
 from app.services.memory import memory_service
 from app.services.document_service import document_service
+from app.services.weather_service import weather_service
 
 # Configure logging
 logging.basicConfig(
@@ -251,6 +252,74 @@ async def chat_endpoint(request: ChatRequest):
         raise HTTPException(
             status_code=500,
             detail=f"Failed to process chat message: {str(e)}"
+        )
+
+
+@app.get("/weather")
+async def get_weather(
+    latitude: float = -0.4167,  # Default to Nyeri, Kenya
+    longitude: float = 36.95,
+    days: int = 7
+):
+    """Get current weather and forecast for farming decisions."""
+    try:
+        # Validate coordinates (Kenya bounds approximately)
+        if not (-5.0 <= latitude <= 5.0) or not (33.5 <= longitude <= 42.0):
+            raise HTTPException(
+                status_code=400, 
+                detail="Coordinates must be within Kenya boundaries"
+            )
+        
+        if not (1 <= days <= 14):
+            raise HTTPException(
+                status_code=400,
+                detail="Forecast days must be between 1 and 14"
+            )
+        
+        # Get weather data
+        current_weather = await weather_service.get_current_weather(latitude, longitude)
+        forecast = await weather_service.get_forecast(latitude, longitude, days)
+        
+        if not current_weather:
+            raise HTTPException(
+                status_code=503,
+                detail="Weather service temporarily unavailable"
+            )
+        
+        return {
+            "current": {
+                "temperature": current_weather.temperature,
+                "humidity": current_weather.humidity,
+                "precipitation": current_weather.precipitation,
+                "wind_speed": current_weather.wind_speed,
+                "condition": current_weather.condition,
+                "timestamp": current_weather.timestamp.isoformat()
+            },
+            "forecast": [
+                {
+                    "date": day.date,
+                    "temperature_max": day.temperature_max,
+                    "temperature_min": day.temperature_min,
+                    "precipitation": day.precipitation,
+                    "precipitation_probability": day.precipitation_probability,
+                    "wind_speed": day.wind_speed,
+                    "condition": day.condition
+                }
+                for day in forecast
+            ],
+            "location": {
+                "latitude": latitude,
+                "longitude": longitude
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Weather endpoint error: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to get weather data: {str(e)}"
         )
 
 
