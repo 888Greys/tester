@@ -1,0 +1,33 @@
+name: 🧪 Test SSH Connection
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test-ssh:
+    name: 🔍 Test SSH Connection
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+
+    - name: 🔑 Setup SSH
+      uses: webfactory/ssh-agent@v0.8.0
+      with:
+        ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+    - name: 🔍 SSH Connection Test
+      run: |
+        echo "🔍 Testing SSH connection..."
+        ssh -o StrictHostKeyChecking=no mathew@${{ secrets.SERVER_IP }} "echo 'SSH connection successful! Server time: \$(date)'"
+        
+    - name: 🐳 Test Docker on Server
+      run: |
+        echo "🐳 Testing Docker on server..."
+        ssh -o StrictHostKeyChecking=no mathew@${{ secrets.SERVER_IP }} "docker --version && docker ps"
+        
+    - name: ✅ Success
+      run: |
+        echo "🎉 SSH connection and Docker access confirmed!"
+        echo "✅ Ready for deployment!"
