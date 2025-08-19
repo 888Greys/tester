@@ -1,3 +1,10 @@
+# Large files that increase build context
+chatlogs.md
+documents/
+*.pdf
+upload_documents.py
+test_*.py
+
 # Python
 __pycache__/
 *.py[cod]
