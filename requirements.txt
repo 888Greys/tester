@@ -25,6 +25,7 @@ aioredis==2.0.1
 # Utilities
 python-dotenv==1.0.0
 python-multipart==0.0.6
+aiofiles==23.2.0
 
 # Document Processing
 llama-index==0.9.10

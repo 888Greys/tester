@@ -86,6 +86,10 @@ services:
       - QDRANT_PORT=6333
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      # Fix cache permissions for AI models
+      - TRANSFORMERS_CACHE=/tmp/transformers_cache
+      - HF_HOME=/tmp/huggingface_cache
+      - SENTENCE_TRANSFORMERS_HOME=/tmp/sentence_transformers_cache
     env_file:
       - .env
     volumes:
