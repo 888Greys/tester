@@ -1,15 +1,16 @@
-name: 🚀 Deploy Gukas AI Agent
+name: 🚀 Deploy Guka AI Agent
 
 on:
   push:
-    branches: [ main, master, dev, feature/memory-system ]
+    branches: [main, master, feature/memory-system]
   pull_request:
-    branches: [ main, master, dev ]
+    branches: [main, master]
+  workflow_dispatch:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
-  DOCKER_HUB_FALLBACK: true
+  # Use lowercase repository name for container registry
+  IMAGE_NAME: brand-design-development/guka-agent
 
 jobs:
   test:
