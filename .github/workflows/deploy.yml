@@ -88,7 +88,14 @@ jobs:
           image=moby/buildkit:latest
           network=host
 
-    - name: 🔑 Login to GitHub Container Registry
+    - name: � Debug image information
+      run: |
+        echo "Registry: ${{ env.REGISTRY }}"
+        echo "Image Name: ${{ env.IMAGE_NAME }}"
+        echo "Full Image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
+        echo "Repository: ${{ github.repository }}"
+
+    - name: �🔑 Login to GitHub Container Registry
       uses: docker/login-action@v3
       with:
         registry: ghcr.io
@@ -118,7 +125,7 @@ jobs:
       if: failure()
       uses: docker/metadata-action@v5
       with:
-        images: branddesigndev/guka-agent
+        images: branddesigndev/gukas-ml
         tags: |
           type=ref,event=branch
           type=ref,event=pr
