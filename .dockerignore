@@ -47,3 +47,6 @@ htmlcov/
 # Logs
 *.log
 logs/
+
+# Disease Detection (large model files not used in main application)
+Disease_Detection/

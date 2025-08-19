@@ -2,18 +2,18 @@ services:
   # PostgreSQL Database for metadata and conversation history
   postgres:
     image: postgres:15-alpine
-    container_name: gukas-postgres-test
+    container_name: gukas-postgres
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-gukas_memory_test}
-      POSTGRES_USER: ${POSTGRES_USER:-gukas_user_test}
+      POSTGRES_DB: ${POSTGRES_DB:-gukas_memory}
+      POSTGRES_USER: ${POSTGRES_USER:-gukas_user}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-gukas_password}
     ports:
-      - "5433:5432"  # Different port to avoid conflicts
+      - "5432:5432"
     volumes:
-      - postgres_test_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data
       - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-gukas_user_test} -d ${POSTGRES_DB:-gukas_memory_test}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-gukas_user} -d ${POSTGRES_DB:-gukas_memory}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -22,12 +22,12 @@ services:
   # Qdrant Vector Database for embeddings and semantic search
   qdrant:
     image: qdrant/qdrant:v1.7.0
-    container_name: gukas-qdrant-test
+    container_name: gukas-qdrant
     ports:
-      - "6335:6333"  # Different ports to avoid conflicts
-      - "6336:6334"
+      - "6333:6333"
+      - "6334:6334"
     volumes:
-      - qdrant_test_data:/qdrant/storage
+      - qdrant_data:/qdrant/storage
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:6333/health"]
       interval: 10s
@@ -38,11 +38,11 @@ services:
   # Redis for caching and session management
   redis:
     image: redis:7-alpine
-    container_name: gukas-redis-test
+    container_name: gukas-redis
     ports:
-      - "6380:6379"  # Different port to avoid conflicts
+      - "6379:6379"
     volumes:
-      - redis_test_data:/data
+      - redis_data:/data
     command: redis-server --appendonly yes
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
@@ -56,8 +56,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: gukas-ai-agent:test
-    container_name: gukas-ai-agent-test
+    image: gukas-ai-agent:latest
+    container_name: gukas-ai-agent
     depends_on:
       postgres:
         condition: service_healthy
@@ -66,14 +66,14 @@ services:
       redis:
         condition: service_healthy
     ports:
-      - "8002:8001"  # Different port for testing
+      - "8001:8001"
     environment:
       - CEREBRAS_API_KEY=${CEREBRAS_API_KEY}
       - CEREBRAS_BASE_URL=${CEREBRAS_BASE_URL:-https://api.cerebras.ai/v1}
       - CEREBRAS_MODEL=${CEREBRAS_MODEL:-gpt-oss-120b}
       - DJANGO_BASE_URL=${DJANGO_BASE_URL}
       - DJANGO_API_TOKEN=${DJANGO_API_TOKEN}
-      - DEBUG=${DEBUG:-true}
+      - DEBUG=${DEBUG:-false}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       # Database connections
       - POSTGRES_HOST=postgres
@@ -89,9 +89,7 @@ services:
       - .env
     volumes:
       # Mount for uploads and document storage
-      - uploads_test_data:/app/uploads
-      # Mount for development (optional - remove for production)
-      - ./app:/app/app:ro
+      - uploads_data:/app/uploads
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "-c", "import httpx; httpx.get('http://localhost:8001/health')"]
@@ -105,17 +103,17 @@ services:
       - "traefik.http.routers.gukas-agent.tls=true"
       - "traefik.http.routers.gukas-agent.tls.certresolver=letsencrypt"
 
-# Named volumes for persistent data (test environment)
+# Named volumes for persistent data
 volumes:
-  postgres_test_data:
+  postgres_data:
     driver: local
-  qdrant_test_data:
+  qdrant_data:
     driver: local
-  redis_test_data:
+  redis_data:
     driver: local
-  uploads_test_data:
+  uploads_data:
     driver: local
 
 networks:
   default:
-    name: gukas-test-network
+    name: gukas-network

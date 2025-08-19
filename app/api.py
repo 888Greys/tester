@@ -9,16 +9,21 @@ import uuid
 from datetime import datetime
 from typing import Dict, Any
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.config import settings
-from app.models import ChatRequest, ChatResponse, HealthResponse, ErrorResponse
+from app.models import (
+    ChatRequest, ChatResponse, HealthResponse, ErrorResponse,
+    DocumentUploadResponse, DocumentSearchRequest, DocumentSearchResponse,
+    DocumentListResponse
+)
 from app.services import agent_service, context_service
 from app.database import db_manager
 from app.services.embedding import vector_memory_service
 from app.services.memory import memory_service
+from app.services.document_service import document_service
 
 # Configure logging
 logging.basicConfig(
@@ -55,6 +60,9 @@ async def startup_event():
         
         logger.info("Initializing vector memory service...")
         await vector_memory_service.initialize()
+        
+        logger.info("Initializing document service...")
+        await document_service.initialize()
         
         logger.info("All services initialized successfully")
     except Exception as e:
@@ -177,10 +185,31 @@ async def chat_endpoint(request: ChatRequest):
                 exclude_session=request.session_id
             )
         
-        # Add memory context to request
+        # Search for relevant documents (RAG)
+        relevant_documents = []
+        if request.message:
+            # Search in user's documents first, then fall back to general knowledge
+            relevant_documents = await document_service.search_documents(
+                query=request.message,
+                user_id=request.user_id,
+                limit=3,
+                similarity_threshold=0.75
+            )
+            
+            # If no user-specific documents found, search globally
+            if not relevant_documents:
+                relevant_documents = await document_service.search_documents(
+                    query=request.message,
+                    user_id=None,  # Search all documents
+                    limit=3,
+                    similarity_threshold=0.75
+                )
+        
+        # Add memory and document context to request
         enhanced_context = {
             **(request.context or {}),
-            "relevant_memories": relevant_memories
+            "relevant_memories": relevant_memories,
+            "relevant_documents": relevant_documents
         }
         
         # Create enhanced request
@@ -324,6 +353,155 @@ async def search_memories(request: Dict[str, Any]):
     except Exception as e:
         logger.error(f"Failed to search memories: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# Document Management Endpoints
+
+@app.post("/documents/upload", response_model=DocumentUploadResponse)
+async def upload_document(
+    file: UploadFile = File(...),
+    user_id: str = Form(...),
+    description: str = Form(None),
+    tags: str = Form(None)  # Comma-separated tags
+):
+    """Upload a document for knowledge base."""
+    try:
+        # Read file content
+        file_content = await file.read()
+        filename = file.filename
+        
+        if not file_content or not filename:
+            raise HTTPException(
+                status_code=400,
+                detail="Valid file is required"
+            )
+        
+        # Parse tags
+        parsed_tags = None
+        if tags:
+            parsed_tags = [tag.strip() for tag in tags.split(",") if tag.strip()]
+        
+        # Upload document
+        document_id = await document_service.upload_document(
+            file_content=file_content,
+            filename=filename,
+            user_id=user_id,
+            description=description,
+            tags=parsed_tags
+        )
+        
+        # Get document info for response
+        doc_info = await document_service.get_document_info(document_id)
+        
+        return DocumentUploadResponse(
+            document_id=document_id,
+            filename=filename,
+            file_size=len(file_content),
+            chunk_count=doc_info.get("chunk_count", 0) if doc_info else 0,
+            upload_date=datetime.now()
+        )
+        
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Document upload error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
+
+
+@app.post("/documents/search", response_model=DocumentSearchResponse)
+async def search_documents(request: DocumentSearchRequest):
+    """Search documents using semantic similarity."""
+    try:
+        results = await document_service.search_documents(
+            query=request.query,
+            user_id=request.user_id,
+            limit=request.limit,
+            similarity_threshold=request.similarity_threshold,
+            tags=request.tags
+        )
+        
+        return DocumentSearchResponse(
+            query=request.query,
+            results=results,
+            total_found=len(results)
+        )
+        
+    except Exception as e:
+        logger.error(f"Document search error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")
+
+
+@app.get("/documents", response_model=DocumentListResponse)
+async def list_documents(
+    user_id: str = None,
+    limit: int = 20,
+    offset: int = 0
+):
+    """List uploaded documents."""
+    try:
+        documents = await document_service.list_documents(
+            user_id=user_id,
+            limit=limit,
+            offset=offset
+        )
+        
+        return DocumentListResponse(
+            documents=documents,
+            total=len(documents),  # This is approximate, would need separate count query for exact total
+            limit=limit,
+            offset=offset
+        )
+        
+    except Exception as e:
+        logger.error(f"Document list error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"List failed: {str(e)}")
+
+
+@app.get("/documents/{document_id}")
+async def get_document_info(document_id: str, user_id: str = None):
+    """Get document information."""
+    try:
+        doc_info = await document_service.get_document_info(document_id)
+        
+        if not doc_info:
+            raise HTTPException(status_code=404, detail="Document not found")
+        
+        # Check user permission if user_id provided
+        if user_id and doc_info.get("user_id") != user_id:
+            raise HTTPException(status_code=403, detail="Access denied")
+        
+        return doc_info
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Get document info error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/documents/{document_id}")
+async def delete_document(document_id: str, user_id: str = None):
+    """Delete a document."""
+    try:
+        success = await document_service.delete_document(document_id, user_id)
+        
+        if not success:
+            raise HTTPException(
+                status_code=404, 
+                detail="Document not found or access denied"
+            )
+        
+        return {
+            "success": True,
+            "message": "Document deleted successfully",
+            "document_id": document_id
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Document delete error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Delete failed: {str(e)}")
 
 
 @app.get("/")
@@ -532,8 +710,8 @@ async def service_info():
             "memory": True,  # Phase 2 ✅
             "vector_search": True,  # Phase 2 ✅
             "user_profiles": True,  # Phase 2 ✅
-            "context_sync": True,  # Phase 2 ✅ - NEW!
-            "documents": False,  # Phase 4
+            "context_sync": True,  # Phase 2 ✅
+            "documents": True,  # Phase 4 ✅ - NEW!
             "tools": False  # Phase 3
         },
         "databases": {
