@@ -1,0 +1,329 @@
+name: 🚀 Deploy Guka AI Agent
+
+on:
+  push:
+    branches: [main, master, feature/memory-system]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  # Use lowercase repository name for container registry
+  IMAGE_NAME: brand-design-development/gukas-ml
+
+jobs:
+  test:
+    name: 🧪 Run Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+    - name: 📦 Check disk usage
+      run: df -h
+    - name: 🐍 Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        
+    - name: 📦 Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install --no-cache-dir -r requirements.txt
+        pip install pytest pytest-asyncio pytest-cov
+      
+    - name: 📦 Check disk usage
+      run: df -h
+    - name: 🧪 Run tests
+      run: |
+        pytest tests/ -v --cov=app --cov-report=xml
+        
+    - name: 📊 Upload coverage
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.xml
+        fail_ci_if_error: false
+
+  build:
+    name: 🐳 Build Docker Image
+    runs-on: ubuntu-latest
+    needs: test
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+
+    - name: 📦 Check disk usage before cleanup
+      run: df -h
+
+    - name: 🧹 Free up disk space
+      run: |
+        # Remove unnecessary software
+        sudo apt-get remove -y '^ghc-.*' '^dotnet-.*' '^llvm-.*' azure-cli google-chrome-stable firefox powershell mono-devel
+        sudo apt-get autoremove -y
+        sudo apt-get autoclean
+        
+        # Clean up Docker
+        docker system prune -af --volumes
+        
+        # Remove large directories
+        sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+        
+        # Clear npm and other caches
+        npm cache clean --force || true
+        pip cache purge || true
+
+    - name: 📦 Check disk usage after cleanup
+      run: df -h
+
+    - name: 🔧 Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      with:
+        driver-opts: |
+          image=moby/buildkit:latest
+          network=host
+
+    - name: � Debug image information
+      run: |
+        echo "Registry: ${{ env.REGISTRY }}"
+        echo "Image Name: ${{ env.IMAGE_NAME }}"
+        echo "Full Image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
+        echo "Repository: ${{ github.repository }}"
+
+    - name: �🔑 Login to GitHub Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: 🔑 Login to Docker Hub (fallback)
+      if: failure()
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+    - name: 📝 Extract metadata (GHCR)
+      id: meta-ghcr
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=sha,format=short
+          type=raw,value=latest,enable={{is_default_branch}}
+
+    - name: 📝 Extract metadata (Docker Hub fallback)
+      id: meta-dockerhub
+      if: failure()
+      uses: docker/metadata-action@v5
+      with:
+        images: branddesigndev/gukas-ml
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=sha,format=short
+          type=raw,value=latest,enable={{is_default_branch}}
+
+    - name: 🐳 Build and push Docker image (GHCR)
+      id: build-ghcr
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./Dockerfile.buildkit
+        push: true
+        tags: ${{ steps.meta-ghcr.outputs.tags }}
+        labels: ${{ steps.meta-ghcr.outputs.labels }}
+        platforms: linux/amd64
+        build-args: |
+          BUILDKIT_INLINE_CACHE=1
+        no-cache: true
+
+    - name: 🐳 Build and push Docker image (Docker Hub fallback)
+      if: failure() && steps.build-ghcr.outcome == 'failure'
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./Dockerfile.buildkit
+        push: true
+        tags: ${{ steps.meta-dockerhub.outputs.tags }}
+        labels: ${{ steps.meta-dockerhub.outputs.labels }}
+        platforms: linux/amd64
+        build-args: |
+          BUILDKIT_INLINE_CACHE=1
+        no-cache: true
+
+  deploy:
+    name: 🚀 Deploy to Production  
+    runs-on: ubuntu-latest
+    needs: [test, build]
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+
+    - name: 🕐 Log deployment start
+      run: |
+        echo "🚀 Starting deployment at $(date)"
+        echo "📍 Branch: ${{ github.ref }}"
+        echo "📝 Commit: ${{ github.sha }}"
+        echo "👤 Actor: ${{ github.actor }}"
+
+    - name: 🔑 Setup SSH
+      uses: webfactory/ssh-agent@v0.8.0
+      with:
+        ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+        
+    - name: 📝 Create deployment files
+      run: |
+        # Create production docker-compose file
+        cat > docker-compose.prod.yml << 'EOF'
+        version: '3.8'
+        
+        services:
+          gukas-agent:
+            image: ghcr.io/brand-design-development/gukas-ml:latest
+            container_name: gukas-ai-agent
+            ports:
+              - "8001:8001"
+            environment:
+              - CEREBRAS_API_KEY=${{ secrets.CEREBRAS_API_KEY }}
+              - CEREBRAS_BASE_URL=https://api.cerebras.ai/v1
+              - CEREBRAS_MODEL=gpt-oss-120b
+              - DJANGO_BASE_URL=${{ secrets.DJANGO_BASE_URL }}
+              - DJANGO_API_TOKEN=${{ secrets.DJANGO_API_TOKEN }}
+              - DEBUG=false
+              - LOG_LEVEL=INFO
+              - HOST=0.0.0.0
+              - PORT=8001
+            restart: unless-stopped
+            healthcheck:
+              test: ["CMD", "python", "-c", "import httpx; httpx.get('http://localhost:8001/health')"]
+              interval: 30s
+              timeout: 10s
+              retries: 3
+              start_period: 40s
+            labels:
+              - "traefik.enable=true"
+              - "traefik.http.routers.gukas-agent.rule=Host(\`${{ secrets.DOMAIN_NAME }}\`)"
+              - "traefik.http.routers.gukas-agent.tls=true"
+              - "traefik.http.routers.gukas-agent.tls.certresolver=letsencrypt"
+              - "traefik.http.services.gukas-agent.loadbalancer.server.port=8001"
+        
+        networks:
+          default:
+            name: gukas-network
+            external: true
+        EOF
+        
+        # Around line 100-130, update the deploy.sh script:
+        cat > deploy.sh << 'EOF'
+        #!/bin/bash
+        set -e
+
+        echo "🚀 Starting deployment of Gukas AI Agent at $(date)"
+        echo "📍 Deployment ID: $(date +%Y%m%d-%H%M%S)"
+
+        # Validate required environment variables
+        echo "🔍 Validating environment variables..."
+        if [ -z "$CEREBRAS_API_KEY" ] || [ -z "$DJANGO_BASE_URL" ] || [ -z "$DJANGO_API_TOKEN" ]; then
+          echo "❌ Missing required environment variables at $(date)"
+          exit 1
+        fi
+        echo "✅ Environment variables validated at $(date)"
+
+        # Stop existing containers
+        echo "🛑 Stopping existing containers at $(date)..."
+        docker stop gukas-ai-agent 2>/dev/null || true
+        docker rm gukas-ai-agent 2>/dev/null || true
+        echo "✅ Containers stopped at $(date)"
+
+        # Pull latest image
+        echo "📥 Pulling latest image at $(date)..."
+        docker pull ghcr.io/brand-design-development/gukas-ml:latest
+        echo "✅ Image pulled at $(date)"
+
+        # Start new container
+        echo "🚀 Starting new container at $(date)..."
+        docker run -d \
+          --name gukas-ai-agent \
+          -p 8001:8001 \
+          -e CEREBRAS_API_KEY="${CEREBRAS_API_KEY}" \
+          -e CEREBRAS_BASE_URL="https://api.cerebras.ai/v1" \
+          -e CEREBRAS_MODEL="gpt-oss-120b" \
+          -e DJANGO_BASE_URL="${DJANGO_BASE_URL}" \
+          -e DJANGO_API_TOKEN="${DJANGO_API_TOKEN}" \
+          -e DEBUG="false" \
+          -e LOG_LEVEL="INFO" \
+          -e HOST="0.0.0.0" \
+          -e PORT="8001" \
+          --restart unless-stopped \
+          ghcr.io/brand-design-development/gukas-ml:latest
+
+        echo "✅ Container started at $(date)"
+
+        # Wait for service to start
+        echo "🏥 Waiting for service to start at $(date)..."
+        sleep 30
+
+        # Health check
+        echo "🔍 Running health check at $(date)..."
+        for i in {1..5}; do
+          echo "🔍 Health check attempt $i at $(date)"
+          if curl -f http://localhost:8001/health; then
+            echo "✅ Deployment successful at $(date)!"
+            echo "🎉 Service is healthy and responding"
+            exit 0
+          fi
+          echo "❌ Attempt $i failed at $(date), retrying in 10 seconds..."
+          sleep 10
+        done
+
+        echo "❌ Deployment failed - health check failed after 5 attempts at $(date)"
+        echo "📋 Container logs:"
+        docker logs gukas-ai-agent --tail 20
+        exit 1
+        EOF
+        
+        chmod +x deploy.sh
+        
+    - name: 🚀 Deploy to server
+      run: |
+        # Copy files to server
+        scp -o StrictHostKeyChecking=no docker-compose.prod.yml mathew@${{ secrets.SERVER_IP }}:~/
+        scp -o StrictHostKeyChecking=no deploy.sh mathew@${{ secrets.SERVER_IP }}:~/
+        
+        # Execute deployment
+        ssh -o StrictHostKeyChecking=no mathew@${{ secrets.SERVER_IP }} << EOF
+          # Login to GitHub Container Registry
+          echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+          
+          # Export environment variables for deployment script
+          export CEREBRAS_API_KEY="${{ secrets.CEREBRAS_API_KEY }}"
+          export DJANGO_BASE_URL="${{ secrets.DJANGO_BASE_URL }}"
+          export DJANGO_API_TOKEN="${{ secrets.DJANGO_API_TOKEN }}"
+          
+          # Run deployment script
+          ./deploy.sh
+        EOF
+        
+    - name: 📊 Deployment notification
+      if: always()
+      run: |
+        if [ "${{ job.status }}" == "success" ]; then
+          echo "✅ Deployment successful to https://${{ secrets.DOMAIN_NAME }}"
+        else
+          echo "❌ Deployment failed"
+        fi
+
+    - name: 🧹 Cleanup Docker disk space
+      run: |
+        docker system prune -af --volumes

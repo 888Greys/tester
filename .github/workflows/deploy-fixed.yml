@@ -122,6 +122,16 @@ jobs:
       with:
         ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
+    - name: 🔍 Debug SSH Key Format
+      run: |
+        echo "🔍 Debugging SSH key format..."
+        echo "Key length: $(echo '${{ secrets.SSH_PRIVATE_KEY }}' | wc -c)"
+        echo "First 50 chars: $(echo '${{ secrets.SSH_PRIVATE_KEY }}' | head -c 50)"
+        echo "Last 50 chars: $(echo '${{ secrets.SSH_PRIVATE_KEY }}' | tail -c 50)"
+        echo "Line count: $(echo '${{ secrets.SSH_PRIVATE_KEY }}' | wc -l)"
+        echo "Key starts with: $(echo '${{ secrets.SSH_PRIVATE_KEY }}' | head -n 1)"
+        echo "Key ends with: $(echo '${{ secrets.SSH_PRIVATE_KEY }}' | tail -n 1)"
+
     - name: 🔍 SSH Diagnostics
       run: |
         echo "🔍 SSH Agent Status:"
@@ -134,18 +144,28 @@ jobs:
       run: |
         echo "🔄 Trying alternative SSH setup..."
         mkdir -p ~/.ssh
-        echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
-        chmod 600 ~/.ssh/id_rsa
+        chmod 700 ~/.ssh
+        
+        # Write key to file with proper formatting
+        cat > ~/.ssh/id_ed25519 << 'EOF'
+        ${{ secrets.SSH_PRIVATE_KEY }}
+        EOF
+        
+        # Ensure proper permissions and line endings
+        chmod 600 ~/.ssh/id_ed25519
+        
+        # Remove any potential carriage returns or extra whitespace
+        sed -i 's/\r$//' ~/.ssh/id_ed25519 2>/dev/null || true
         
         # Test the key format
         echo "🔍 Testing key format:"
-        ssh-keygen -l -f ~/.ssh/id_rsa || echo "Key format issue detected"
+        ssh-keygen -l -f ~/.ssh/id_ed25519 || echo "Key format issue detected"
         
         # Add to known hosts
         ssh-keyscan -H ${{ secrets.SERVER_IP }} >> ~/.ssh/known_hosts 2>/dev/null || true
         
         # Test connection
-        ssh -i ~/.ssh/id_rsa -o ConnectTimeout=10 mathew@${{ secrets.SERVER_IP }} "echo 'Alternative SSH connection successful'" || echo "Alternative SSH also failed"
+        ssh -i ~/.ssh/id_ed25519 -o ConnectTimeout=10 -o StrictHostKeyChecking=no mathew@${{ secrets.SERVER_IP }} "echo 'Alternative SSH connection successful'" || echo "Alternative SSH also failed"
         
     - name: 📝 Create deployment script
       run: |
