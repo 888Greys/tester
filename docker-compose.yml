@@ -8,7 +8,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-gukas_user_test}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-gukas_password}
     ports:
-      - "5433:5432"  # Different port to avoid conflicts
+      - "5555:5432"  # Different port to avoid conflicts
     volumes:
       - postgres_test_data:/var/lib/postgresql/data
       - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
@@ -24,8 +24,8 @@ services:
     image: qdrant/qdrant:v1.7.0
     container_name: gukas-qdrant-test
     ports:
-      - "6335:6333"  # Different ports to avoid conflicts
-      - "6336:6334"
+      - "7333:6333"  # Different ports to avoid conflicts
+      - "7334:6334"
     volumes:
       - qdrant_test_data:/qdrant/storage
     healthcheck:
@@ -40,7 +40,7 @@ services:
     image: redis:7-alpine
     container_name: gukas-redis-test
     ports:
-      - "6380:6379"  # Different port to avoid conflicts
+      - "7379:6379"  # Different port to avoid conflicts
     volumes:
       - redis_test_data:/data
     command: redis-server --appendonly yes

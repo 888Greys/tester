@@ -14,9 +14,9 @@ The test environment uses different:
 | Service | Production Port | Test Port |
 |---------|----------------|-----------|
 | Gukas AI Agent | 8001 | **8002** |
-| PostgreSQL | 5432 | **5433** |
-| Qdrant | 6333/6334 | **6335/6336** |
-| Redis | 6379 | **6380** |
+| PostgreSQL | 5432 | **5555** |
+| Qdrant | 6333/6334 | **7333/7334** |
+| Redis | 6379 | **7379** |
 
 ### Container Names:
 - `gukas-ai-agent-test`
