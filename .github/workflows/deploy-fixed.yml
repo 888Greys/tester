@@ -121,6 +121,31 @@ jobs:
       uses: webfactory/ssh-agent@v0.8.0
       with:
         ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+    - name: 🔍 SSH Diagnostics
+      run: |
+        echo "🔍 SSH Agent Status:"
+        ssh-add -l || echo "No keys in agent"
+        echo "🔍 Testing SSH connection:"
+        ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 mathew@${{ secrets.SERVER_IP }} "echo 'SSH connection successful'" || echo "SSH connection failed"
+
+    - name: 🔑 Alternative SSH Setup (if webfactory fails)
+      if: failure()
+      run: |
+        echo "🔄 Trying alternative SSH setup..."
+        mkdir -p ~/.ssh
+        echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+        
+        # Test the key format
+        echo "🔍 Testing key format:"
+        ssh-keygen -l -f ~/.ssh/id_rsa || echo "Key format issue detected"
+        
+        # Add to known hosts
+        ssh-keyscan -H ${{ secrets.SERVER_IP }} >> ~/.ssh/known_hosts 2>/dev/null || true
+        
+        # Test connection
+        ssh -i ~/.ssh/id_rsa -o ConnectTimeout=10 mathew@${{ secrets.SERVER_IP }} "echo 'Alternative SSH connection successful'" || echo "Alternative SSH also failed"
         
     - name: 📝 Create deployment script
       run: |
@@ -196,11 +221,19 @@ jobs:
         
     - name: 🚀 Deploy to server
       run: |
-        # Copy deployment script to server
-        scp -o StrictHostKeyChecking=no deploy.sh mathew@${{ secrets.SERVER_IP }}:~/
+        # Copy deployment script to server (try ssh-agent first, then fallback)
+        if ssh-add -l >/dev/null 2>&1; then
+          echo "📡 Using SSH agent for deployment..."
+          scp -o StrictHostKeyChecking=no deploy.sh mathew@${{ secrets.SERVER_IP }}:~/
+          SSH_CMD="ssh -o StrictHostKeyChecking=no mathew@${{ secrets.SERVER_IP }}"
+        else
+          echo "📡 Using direct SSH key for deployment..."
+          scp -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no deploy.sh mathew@${{ secrets.SERVER_IP }}:~/
+          SSH_CMD="ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no mathew@${{ secrets.SERVER_IP }}"
+        fi
         
         # Execute deployment
-        ssh -o StrictHostKeyChecking=no mathew@${{ secrets.SERVER_IP }} << EOF
+        $SSH_CMD << EOF
           # Login to GitHub Container Registry
           echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
           
