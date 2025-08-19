@@ -10,7 +10,7 @@ on:
 env:
   REGISTRY: ghcr.io
   # Use lowercase repository name for container registry
-  IMAGE_NAME: brand-design-development/guka-agent
+  IMAGE_NAME: brand-design-development/gukas-ml
 
 jobs:
   test:
@@ -183,7 +183,7 @@ jobs:
         
         services:
           gukas-agent:
-            image: ghcr.io/brand-design-development/guka-agent:latest
+            image: ghcr.io/brand-design-development/gukas-ml:latest
             container_name: gukas-ai-agent
             ports:
               - "8001:8001"
@@ -241,7 +241,7 @@ jobs:
 
         # Pull latest image
         echo "📥 Pulling latest image at $(date)..."
-        docker pull ghcr.io/brand-design-development/guka-agent:latest
+        docker pull ghcr.io/brand-design-development/gukas-ml:latest
         echo "✅ Image pulled at $(date)"
 
         # Start new container
@@ -259,7 +259,7 @@ jobs:
           -e HOST="0.0.0.0" \
           -e PORT="8001" \
           --restart unless-stopped \
-          ghcr.io/brand-design-development/guka-agent:latest
+          ghcr.io/brand-design-development/gukas-ml:latest
 
         echo "✅ Container started at $(date)"
 
