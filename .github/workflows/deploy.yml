@@ -1,11 +1,12 @@
-name: 🚀 Deploy Guka AI Agent
+name: 🚀 Deploy Guka AI Agent (DISABLED)
 
 on:
-  push:
-    branches: [main, master, feature/memory-system]
-  pull_request:
-    branches: [main, master]
+  # Temporarily disabled to test new workflow
   workflow_dispatch:
+  # push:
+  #   branches: [main, master, feature/memory-system]
+  # pull_request:
+  #   branches: [main, master]
 
 env:
   REGISTRY: ghcr.io
