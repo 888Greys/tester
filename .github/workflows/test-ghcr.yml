@@ -1,0 +1,57 @@
+name: 🧪 Test GHCR Access
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [test-ghcr]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  test-ghcr:
+    name: 🔍 Test GitHub Container Registry Access
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+
+    - name: 📝 Show repository context
+      run: |
+        echo "Repository: ${{ github.repository }}"
+        echo "Actor: ${{ github.actor }}"
+        echo "Registry: ${{ env.REGISTRY }}"
+        echo "Image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
+
+    - name: 🔑 Login to GitHub Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: 🐳 Build and push test image
+      run: |
+        # Create simple test Dockerfile
+        cat > Dockerfile.test << 'EOF'
+        FROM alpine:latest
+        RUN echo "Test image for GHCR access" > /test.txt
+        CMD ["cat", "/test.txt"]
+        EOF
+        
+        # Build and push test image
+        docker build -f Dockerfile.test -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:test .
+        docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:test
+        
+        echo "✅ Successfully pushed to GHCR!"
+
+    - name: 🧹 Cleanup
+      if: always()
+      run: |
+        docker rmi ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:test || true
