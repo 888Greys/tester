@@ -126,7 +126,7 @@ class DocumentSearchRequest(BaseModel):
     query: str = Field(..., min_length=1, max_length=1000, description="Search query")
     user_id: Optional[str] = Field(None, description="User ID to filter documents")
     limit: int = Field(default=5, ge=1, le=20, description="Maximum number of results")
-    similarity_threshold: float = Field(default=0.7, ge=0.0, le=1.0, description="Minimum similarity score")
+    similarity_threshold: float = Field(default=0.3, ge=0.0, le=1.0, description="Minimum similarity score")
     tags: Optional[List[str]] = Field(None, description="Filter by document tags")
     
     model_config = ConfigDict(
@@ -135,7 +135,7 @@ class DocumentSearchRequest(BaseModel):
                 "query": "coffee plant diseases",
                 "user_id": "farmer_123",
                 "limit": 5,
-                "similarity_threshold": 0.7,
+                "similarity_threshold": 0.3,
                 "tags": ["coffee", "farming"]
             }
         }

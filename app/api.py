@@ -193,7 +193,7 @@ async def chat_endpoint(request: ChatRequest):
                 query=request.message,
                 user_id=request.user_id,
                 limit=3,
-                similarity_threshold=0.75
+                similarity_threshold=0.3
             )
             
             # If no user-specific documents found, search globally
@@ -202,7 +202,7 @@ async def chat_endpoint(request: ChatRequest):
                     query=request.message,
                     user_id=None,  # Search all documents
                     limit=3,
-                    similarity_threshold=0.75
+                    similarity_threshold=0.3
                 )
         
         # Add memory and document context to request

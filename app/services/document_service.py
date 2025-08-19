@@ -256,7 +256,7 @@ class DocumentService:
         query: str,
         user_id: Optional[str] = None,
         limit: int = 5,
-        similarity_threshold: float = 0.7,
+        similarity_threshold: float = 0.3,
         tags: Optional[List[str]] = None
     ) -> List[Dict[str, Any]]:
         """Search documents using semantic similarity."""
