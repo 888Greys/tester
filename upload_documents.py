@@ -37,10 +37,10 @@ class DocumentUploader:
             print(f"❌ Cannot connect to agent: {e}")
             return False
     
-    def get_existing_documents(self) -> List[Dict[str, Any]]:
+    def get_existing_documents(self, user_id: str = "global_admin") -> List[Dict[str, Any]]:
         """Get list of already uploaded documents."""
         try:
-            response = self.session.get(f"{self.base_url}/documents/list")
+            response = self.session.get(f"{self.base_url}/documents/list?user_id={user_id}")
             if response.status_code == 200:
                 return response.json().get('documents', [])
             else:
@@ -50,13 +50,14 @@ class DocumentUploader:
             print(f"⚠️ Error fetching existing documents: {e}")
             return []
     
-    def upload_document(self, file_path: Path, description: str = None, tags: str = "coffee,farming,kenya") -> bool:
+    def upload_document(self, file_path: Path, description: str = None, tags: str = "coffee,farming,kenya", user_id: str = "global_admin") -> bool:
         """Upload a single document to the vector database."""
         try:
             # Prepare the file and form data
             with open(file_path, 'rb') as file:
                 files = {'file': (file_path.name, file, 'application/octet-stream')}
                 data = {
+                    'user_id': user_id,  # Add user_id field
                     'description': description or f"Coffee farming guide: {file_path.name}",
                     'tags': tags
                 }
@@ -103,7 +104,7 @@ class DocumentUploader:
         
         return sorted(documents)
     
-    def upload_all_documents(self, folder_path: str) -> Dict[str, int]:
+    def upload_all_documents(self, folder_path: str, user_id: str = "global_admin") -> Dict[str, int]:
         """Upload all documents from the specified folder."""
         documents = self.find_documents(folder_path)
         
@@ -111,13 +112,13 @@ class DocumentUploader:
             print(f"📁 No documents found in {folder_path}")
             return {"uploaded": 0, "failed": 0, "skipped": 0}
         
-        print(f"📚 Found {len(documents)} documents to upload:")
+        print(f"📚 Found {len(documents)} documents to upload as global documents:")
         for doc in documents:
             print(f"   📄 {doc.name}")
         print()
         
         # Get existing documents to avoid duplicates
-        existing_docs = self.get_existing_documents()
+        existing_docs = self.get_existing_documents(user_id)
         existing_names = [doc.get('filename', '') for doc in existing_docs]
         
         uploaded = 0
@@ -130,7 +131,7 @@ class DocumentUploader:
                 skipped += 1
                 continue
             
-            if self.upload_document(doc_path):
+            if self.upload_document(doc_path, user_id=user_id):
                 uploaded += 1
             else:
                 failed += 1
