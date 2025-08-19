@@ -241,30 +241,72 @@ jobs:
         
     - name: 🚀 Deploy to server
       run: |
+        # Set SSH connection options for stability
+        SSH_OPTS="-o StrictHostKeyChecking=no -o ServerAliveInterval=30 -o ServerAliveCountMax=3 -o ConnectTimeout=10"
+        
         # Copy deployment script to server (try ssh-agent first, then fallback)
         if ssh-add -l >/dev/null 2>&1; then
           echo "📡 Using SSH agent for deployment..."
-          scp -o StrictHostKeyChecking=no deploy.sh mathew@${{ secrets.SERVER_IP }}:~/
-          SSH_CMD="ssh -o StrictHostKeyChecking=no mathew@${{ secrets.SERVER_IP }}"
+          scp $SSH_OPTS deploy.sh mathew@${{ secrets.SERVER_IP }}:~/
+          SSH_CMD="ssh $SSH_OPTS mathew@${{ secrets.SERVER_IP }}"
         else
           echo "📡 Using direct SSH key for deployment..."
-          scp -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no deploy.sh mathew@${{ secrets.SERVER_IP }}:~/
-          SSH_CMD="ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no mathew@${{ secrets.SERVER_IP }}"
+          scp -i ~/.ssh/id_ed25519 $SSH_OPTS deploy.sh mathew@${{ secrets.SERVER_IP }}:~/
+          SSH_CMD="ssh -i ~/.ssh/id_ed25519 $SSH_OPTS mathew@${{ secrets.SERVER_IP }}"
         fi
         
-        # Execute deployment
-        $SSH_CMD << EOF
-          # Login to GitHub Container Registry
-          echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+        # Step 1: Login to registry and prepare environment
+        echo "🔑 Step 1: Setting up environment..."
+        $SSH_CMD "echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin"
+        
+        # Step 2: Stop existing containers
+        echo "🛑 Step 2: Stopping existing containers..."
+        $SSH_CMD "docker stop gukas-ai-agent 2>/dev/null || true; docker rm gukas-ai-agent 2>/dev/null || true"
+        
+        # Step 3: Pull new image (separate command to avoid timeout)
+        echo "📥 Step 3: Pulling latest image..."
+        $SSH_CMD "docker pull ghcr.io/brand-design-development/gukas-ml:latest"
+        
+        # Step 4: Start new container
+        echo "🚀 Step 4: Starting new container..."
+        $SSH_CMD "
+          export CEREBRAS_API_KEY='${{ secrets.CEREBRAS_API_KEY }}'
+          export DJANGO_BASE_URL='${{ secrets.DJANGO_BASE_URL }}'
+          export DJANGO_API_TOKEN='${{ secrets.DJANGO_API_TOKEN }}'
           
-          # Export environment variables for deployment script
-          export CEREBRAS_API_KEY="${{ secrets.CEREBRAS_API_KEY }}"
-          export DJANGO_BASE_URL="${{ secrets.DJANGO_BASE_URL }}"
-          export DJANGO_API_TOKEN="${{ secrets.DJANGO_API_TOKEN }}"
-          
-          # Run deployment script
-          ./deploy.sh
-        EOF
+          docker run -d \
+            --name gukas-ai-agent \
+            -p 8001:8001 \
+            -e CEREBRAS_API_KEY=\"\${CEREBRAS_API_KEY}\" \
+            -e CEREBRAS_BASE_URL=\"https://api.cerebras.ai/v1\" \
+            -e CEREBRAS_MODEL=\"gpt-oss-120b\" \
+            -e DJANGO_BASE_URL=\"\${DJANGO_BASE_URL}\" \
+            -e DJANGO_API_TOKEN=\"\${DJANGO_API_TOKEN}\" \
+            -e DEBUG=\"false\" \
+            -e LOG_LEVEL=\"INFO\" \
+            -e HOST=\"0.0.0.0\" \
+            -e PORT=\"8001\" \
+            --restart unless-stopped \
+            ghcr.io/brand-design-development/gukas-ml:latest
+        "
+        
+        # Step 5: Health check with retry
+        echo "🏥 Step 5: Health check..."
+        for i in {1..6}; do
+          echo "🔍 Health check attempt $i..."
+          if $SSH_CMD "curl -f http://localhost:8001/health" 2>/dev/null; then
+            echo "✅ Deployment successful!"
+            break
+          elif [ $i -eq 6 ]; then
+            echo "❌ Health check failed after 6 attempts"
+            echo "📋 Container logs:"
+            $SSH_CMD "docker logs gukas-ai-agent --tail 20"
+            exit 1
+          else
+            echo "⏳ Waiting 15 seconds before retry..."
+            sleep 15
+          fi
+        done
         
     - name: 📊 Deployment notification
       if: always()
