@@ -7,7 +7,8 @@ another one
 import logging
 import uuid
 from datetime import datetime
-from typing import Dict, Any
+from typing import Dict, Any, Optional
+from dataclasses import asdict
 
 from fastapi import FastAPI, HTTPException, Request, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
@@ -767,6 +768,331 @@ async def clear_user_context(request: Dict[str, Any]):
     except Exception as e:
         logger.error(f"Context clear error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Context clear failed: {str(e)}")
+
+
+# Predictive Analytics Routes
+from app.services.predictive_analytics import predictive_analytics_service
+from app.services.predictive_analytics_config import PredictiveAnalyticsConfig
+
+@app.get("/predictions/farming")
+async def get_farming_predictions(
+    latitude: float,
+    longitude: float,
+    user_id: Optional[str] = None,
+    days_ahead: int = 14
+) -> Dict[str, Any]:
+    """
+    Get comprehensive farming predictions for a location.
+    
+    Args:
+        latitude: Farm latitude coordinates
+        longitude: Farm longitude coordinates  
+        user_id: Optional user ID for personalized predictions
+        days_ahead: Number of days to predict (3-30, default 14)
+    
+    Returns:
+        Comprehensive farming predictions including weather, risks, and recommendations
+    """
+    try:
+        # Validate input
+        days_ahead = PredictiveAnalyticsConfig.validate_prediction_days(days_ahead)
+        
+        # Initialize service if needed
+        if not hasattr(predictive_analytics_service, 'weather_service') or not predictive_analytics_service.weather_service:
+            await predictive_analytics_service.initialize()
+        
+        # Get predictions
+        predictions = await predictive_analytics_service.get_farming_predictions(
+            latitude=latitude,
+            longitude=longitude,
+            user_id=user_id,
+            days_ahead=days_ahead
+        )
+        
+        return predictions
+        
+    except Exception as e:
+        logger.error(f"Error getting farming predictions: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/predictions/weather-impact")
+async def get_weather_impact_prediction(
+    latitude: float,
+    longitude: float,
+    days_ahead: int = 7
+) -> Dict[str, Any]:
+    """
+    Get weather impact predictions for farming activities.
+    
+    Args:
+        latitude: Farm latitude coordinates
+        longitude: Farm longitude coordinates
+        days_ahead: Number of days to analyze (default 7)
+    
+    Returns:
+        Weather impact analysis and farming recommendations
+    """
+    try:
+        days_ahead = min(days_ahead, 14)  # Limit to 2 weeks for weather impact
+        
+        await predictive_analytics_service.initialize()
+        
+        # Get weather predictions only
+        weather_predictions = await predictive_analytics_service._get_weather_predictions(
+            latitude, longitude, days_ahead
+        )
+        
+        # Convert to dict format for analysis
+        weather_dict = [asdict(pred) for pred in weather_predictions]
+        
+        # Analyze impact
+        farming_impact = {
+            "daily_impacts": weather_dict,
+            "summary": _summarize_weather_impact(weather_dict),
+            "recommendations": _get_weather_recommendations(weather_dict)
+        }
+        
+        return {
+            "location": {"latitude": latitude, "longitude": longitude},
+            "prediction_period": f"{days_ahead} days",
+            "weather_impact": farming_impact,
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting weather impact prediction: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/predictions/disease-risk")
+async def get_disease_risk_prediction(
+    latitude: float,
+    longitude: float,
+    user_id: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    Get disease and pest risk predictions.
+    
+    Args:
+        latitude: Farm latitude coordinates
+        longitude: Farm longitude coordinates
+        user_id: Optional user ID for personalized risk assessment
+    
+    Returns:
+        Disease and pest risk predictions with prevention advice
+    """
+    try:
+        await predictive_analytics_service.initialize()
+        
+        # Get weather forecast for risk analysis
+        weather_forecast = await predictive_analytics_service._get_weather_predictions(
+            latitude, longitude, 14
+        )
+        
+        # Convert to dict format for risk analysis
+        weather_dict = [asdict(pred) for pred in weather_forecast]
+        
+        # Get risk predictions
+        risk_predictions = await predictive_analytics_service._predict_disease_pest_risks(
+            weather_dict
+        )
+        
+        return {
+            "location": {"latitude": latitude, "longitude": longitude},
+            "risk_assessment": risk_predictions,
+            "forecast_period": "14 days",
+            "timestamp": datetime.now().isoformat(),
+            "general_advice": [
+                "Maintain good farm hygiene",
+                "Monitor plants regularly for early symptoms",
+                "Apply preventive treatments during low-risk periods",
+                "Keep detailed records of treatments and observations"
+            ]
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting disease risk prediction: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/predictions/seasonal")
+async def get_seasonal_predictions() -> Dict[str, Any]:
+    """
+    Get seasonal farming predictions and calendar.
+    
+    Returns:
+        Seasonal predictions, farming calendar, and activity recommendations
+    """
+    try:
+        await predictive_analytics_service.initialize()
+        
+        seasonal_predictions = await predictive_analytics_service._get_seasonal_predictions()
+        
+        return {
+            "seasonal_forecast": seasonal_predictions,
+            "farming_calendar": predictive_analytics_service.coffee_calendar,
+            "timestamp": datetime.now().isoformat(),
+            "region": "Kenya Coffee Growing Regions"
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting seasonal predictions: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/predictions/activity-recommendations")
+async def get_activity_recommendations(
+    latitude: float,
+    longitude: float,
+    user_id: Optional[str] = None,
+    days_ahead: int = 7
+) -> Dict[str, Any]:
+    """
+    Get farming activity recommendations based on weather and season.
+    
+    Args:
+        latitude: Farm latitude coordinates
+        longitude: Farm longitude coordinates
+        user_id: Optional user ID for personalized recommendations
+        days_ahead: Number of days to plan ahead (default 7)
+    
+    Returns:
+        Prioritized farming activity recommendations
+    """
+    try:
+        days_ahead = min(days_ahead, 14)
+        
+        await predictive_analytics_service.initialize()
+        
+        # Get weather forecast
+        weather_forecast = await predictive_analytics_service._get_weather_predictions(
+            latitude, longitude, days_ahead
+        )
+        
+        # Get seasonal context
+        seasonal_predictions = await predictive_analytics_service._get_seasonal_predictions()
+        
+        # Convert weather forecast to dict format
+        weather_dict = [asdict(pred) for pred in weather_forecast]
+        
+        # Get activity recommendations
+        recommendations = await predictive_analytics_service._get_activity_recommendations(
+            weather_dict, seasonal_predictions, user_id
+        )
+        
+        return {
+            "location": {"latitude": latitude, "longitude": longitude},
+            "planning_period": f"{days_ahead} days",
+            "recommendations": recommendations,
+            "current_season": seasonal_predictions.get("current_season", {}),
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting activity recommendations: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/predictions/yield-forecast")
+async def get_yield_forecast(
+    latitude: float,
+    longitude: float,
+    user_id: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    Get yield impact predictions based on weather and farming practices.
+    
+    Args:
+        latitude: Farm latitude coordinates
+        longitude: Farm longitude coordinates
+        user_id: Optional user ID for personalized yield predictions
+    
+    Returns:
+        Yield impact predictions and optimization recommendations
+    """
+    try:
+        await predictive_analytics_service.initialize()
+        
+        # Get weather forecast
+        weather_forecast = await predictive_analytics_service._get_weather_predictions(
+            latitude, longitude, 14
+        )
+        
+        # Convert to dict format
+        weather_dict = [asdict(pred) for pred in weather_forecast]
+        
+        # Get yield predictions
+        yield_predictions = await predictive_analytics_service._predict_yield_impacts(
+            weather_dict, user_id
+        )
+        
+        return {
+            "location": {"latitude": latitude, "longitude": longitude},
+            "yield_forecast": yield_predictions,
+            "forecast_period": "14 days",
+            "timestamp": datetime.now().isoformat(),
+            "disclaimer": "Predictions are estimates based on weather data and general farming practices"
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting yield forecast: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/predictions/locations")
+async def get_prediction_locations() -> Dict[str, Any]:
+    """
+    Get available prediction locations (Kenya coffee regions).
+    
+    Returns:
+        Available locations with coordinates for predictions
+    """
+    try:
+        return {
+            "available_locations": PredictiveAnalyticsConfig.DEFAULT_LOCATIONS,
+            "usage": "Use latitude and longitude from these locations or provide custom coordinates",
+            "regions": "Kenya Coffee Growing Regions"
+        }
+    except Exception as e:
+        logger.error(f"Error getting prediction locations: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+def _summarize_weather_impact(weather_predictions: list) -> Dict[str, Any]:
+    """Summarize weather impact across the forecast period."""
+    if not weather_predictions:
+        return {"summary": "No weather data available"}
+    
+    total_rainfall = sum(day["rainfall_amount"] for day in weather_predictions)
+    avg_temp = sum((day["temperature_range"][0] + day["temperature_range"][1]) / 2 for day in weather_predictions) / len(weather_predictions)
+    
+    high_rain_days = sum(1 for day in weather_predictions if day["rainfall_amount"] > 20)
+    optimal_days = sum(1 for day in weather_predictions if day["rainfall_amount"] < 5 and 18 <= (day["temperature_range"][0] + day["temperature_range"][1]) / 2 <= 25)
+    
+    return {
+        "total_rainfall_mm": round(total_rainfall, 1),
+        "average_temperature_c": round(avg_temp, 1),
+        "high_rain_days": high_rain_days,
+        "optimal_work_days": optimal_days,
+        "overall_conditions": "favorable" if optimal_days > len(weather_predictions) / 2 else "challenging"
+    }
+
+def _get_weather_recommendations(weather_predictions: list) -> list:
+    """Get weather-based recommendations."""
+    if not weather_predictions:
+        return ["No weather data available for recommendations"]
+    
+    recommendations = []
+    total_rainfall = sum(day["rainfall_amount"] for day in weather_predictions)
+    
+    if total_rainfall < 50:
+        recommendations.append("Plan irrigation - rainfall below optimal levels")
+    elif total_rainfall > 200:
+        recommendations.append("Ensure good drainage - heavy rainfall expected")
+    
+    high_temp_days = sum(1 for day in weather_predictions if (day["temperature_range"][0] + day["temperature_range"][1]) / 2 > 28)
+    if high_temp_days > 3:
+        recommendations.append("Schedule activities for early morning/late afternoon due to high temperatures")
+    
+    dry_days = sum(1 for day in weather_predictions if day["rainfall_amount"] < 2)
+    if dry_days > 4:
+        recommendations.append("Good period for field work and spraying activities")
+    
+    return recommendations if recommendations else ["Weather conditions appear normal - continue standard practices"]
 
 
 @app.get("/info")
