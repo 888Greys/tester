@@ -26,6 +26,7 @@ from app.services.embedding import vector_memory_service
 from app.services.memory import memory_service
 from app.services.document_service import document_service
 from app.services.weather_service import weather_service
+from app.services.disease_detection import disease_detection_service
 
 # Configure logging
 logging.basicConfig(
@@ -577,6 +578,97 @@ async def delete_document(document_id: str, user_id: str = None):
         raise HTTPException(status_code=500, detail=f"Delete failed: {str(e)}")
 
 
+# Disease Detection Endpoints
+@app.post("/disease/predict")
+async def predict_disease(
+    image: UploadFile = File(...),
+    user_id: Optional[str] = Form(None)
+):
+    """
+    Predict coffee disease from uploaded image
+    
+    Args:
+        image: Image file (JPG, PNG, etc.)
+        user_id: Optional user identifier for logging
+        
+    Returns:
+        Disease prediction results with recommendations
+    """
+    try:
+        # Validate file type
+        if not image.content_type or not image.content_type.startswith('image/'):
+            raise HTTPException(
+                status_code=400, 
+                detail="File must be an image (JPG, PNG, etc.)"
+            )
+        
+        # Read image data
+        image_data = await image.read()
+        
+        if len(image_data) == 0:
+            raise HTTPException(
+                status_code=400, 
+                detail="Empty image file"
+            )
+        
+        # Get prediction from disease detection service
+        result = disease_detection_service.predict_disease(image_data)
+        
+        if not result['success']:
+            raise HTTPException(
+                status_code=500, 
+                detail=result['error']
+            )
+        
+        # Log the prediction
+        logger.info(f"Disease prediction for user {user_id}: {result['predicted_class']} (confidence: {result['confidence']:.4f})")
+        
+        # Return comprehensive results
+        return {
+            "success": True,
+            "prediction": {
+                "disease": result['predicted_class'],
+                "confidence": result['confidence'],
+                "is_healthy": result['predicted_class'] == "Healthy",
+                "probabilities": result['probabilities']
+            },
+            "recommendations": result['recommendations'],
+            "metadata": {
+                "timestamp": datetime.now().isoformat(),
+                "filename": image.filename,
+                "file_size": len(image_data),
+                "user_id": user_id
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Disease prediction error: {str(e)}")
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Disease prediction failed: {str(e)}"
+        )
+
+
+@app.get("/disease/health")
+async def get_disease_detection_health():
+    """Get health status of disease detection service"""
+    try:
+        health_status = disease_detection_service.get_health_status()
+        return {
+            "success": True,
+            **health_status
+        }
+    except Exception as e:
+        logger.error(f"Disease detection health check error: {str(e)}")
+        return {
+            "success": False,
+            "error": str(e),
+            "status": "unhealthy"
+        }
+
+
 @app.get("/")
 async def root():
     """Root endpoint with basic service information."""
@@ -589,7 +681,10 @@ async def root():
         "features": {
             "memory": True,
             "vector_search": True,
-            "user_profiles": True
+            "user_profiles": True,
+            "disease_detection": disease_detection_service.is_available(),
+            "weather_analytics": True,
+            "predictive_insights": True
         }
     }
 

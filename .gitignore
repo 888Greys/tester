@@ -110,4 +110,4 @@ dmypy.json
 
 # Backup files
 *.bak
-*.backup
+*.backupCoffee_Disease_Detection/
