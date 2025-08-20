@@ -25,7 +25,6 @@ from app.services.embedding import vector_memory_service
 from app.services.memory import memory_service
 from app.services.document_service import document_service
 from app.services.weather_service import weather_service
-from app.api.memory_intelligence import router as memory_intelligence_router
 
 # Configure logging
 logging.basicConfig(
@@ -53,7 +52,7 @@ app.add_middleware(
 )
 
 # Include memory intelligence router
-app.include_router(memory_intelligence_router)
+# Memory intelligence routes already included above
 
 
 @app.on_event("startup")
@@ -799,14 +798,54 @@ if __name__ == "__main__":
     import uvicorn
     
     logger.info(f"Starting {settings.app_name} v{settings.app_version}")
-    logger.info(f"Debug mode: {settings.debug}")
-    logger.info(f"Cerebras model: {settings.cerebras_model}")
-    logger.info(f"Memory system: enabled")
-    
-    uvicorn.run(
-        "app.api:app",
-        host=settings.host,
-        port=settings.port,
-        reload=settings.debug,
-        log_level=settings.log_level.lower()
-    )
+
+# Memory Intelligence Routes
+from fastapi import Depends, HTTPException, status
+from typing import List, Dict, Any, Optional
+from app.services.memory_intelligence import memory_intelligence_service
+
+@app.get("/memory/insights/{user_id}")
+async def get_memory_insights(user_id: str) -> Dict[str, Any]:
+    """Get memory insights for a user."""
+    try:
+        insights = await memory_intelligence_service.get_memory_insights(user_id)
+        return {"insights": insights}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/memory/context/{user_id}")
+async def get_intelligent_memory_context(
+    user_id: str,
+    query: str,
+    max_memories: int = 5,
+    include_insights: bool = True
+) -> Dict[str, Any]:
+    """Get intelligent memory context for a user query."""
+    try:
+        context = await memory_intelligence_service.get_intelligent_memory_context(
+            query=query,
+            user_id=user_id,
+            max_memories=max_memories,
+            include_insights=include_insights
+        )
+        return context
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/memory/consolidate/{user_id}")
+async def consolidate_memories(user_id: str) -> Dict[str, Any]:
+    """Consolidate memories for a user."""
+    try:
+        result = await memory_intelligence_service.consolidate_memories(user_id)
+        return {"consolidated": result}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/memory/analysis/{user_id}")
+async def get_memory_analysis(user_id: str) -> Dict[str, Any]:
+    """Get memory analysis for a user."""
+    try:
+        analysis = await memory_intelligence_service.analyze_memory_patterns(user_id)
+        return {"analysis": analysis}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
