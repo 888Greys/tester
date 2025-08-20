@@ -25,6 +25,7 @@ from app.services.embedding import vector_memory_service
 from app.services.memory import memory_service
 from app.services.document_service import document_service
 from app.services.weather_service import weather_service
+from app.api.memory_intelligence import router as memory_intelligence_router
 
 # Configure logging
 logging.basicConfig(
@@ -50,6 +51,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Include memory intelligence router
+app.include_router(memory_intelligence_router)
 
 
 @app.on_event("startup")

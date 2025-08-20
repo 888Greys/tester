@@ -11,6 +11,7 @@ from datetime import datetime
 from app.llm_client import cerebras_client, AgentPrompts
 from app.models.api_models import ChatRequest, ChatResponse
 from app.config import settings
+from app.services.memory_intelligence import memory_intelligence_service
 
 logger = logging.getLogger(__name__)
 
@@ -46,8 +47,28 @@ class AgentService:
             
             logger.info(f"Processing chat message for session: {session_id}")
             
-            # Extract relevant memories from context
-            relevant_memories = request.context.get("relevant_memories", []) if request.context else []
+            # Get intelligent memory context instead of basic memory (only if user_id provided)
+            if request.user_id:
+                intelligent_context = await memory_intelligence_service.get_intelligent_memory_context(
+                    query=request.message,
+                    user_id=request.user_id,
+                    max_memories=5,
+                    include_insights=True
+                )
+                
+                # Extract relevant memories and insights
+                relevant_memories = intelligent_context.get("relevant_memories", [])
+                memory_insights = intelligent_context.get("memory_insights", [])
+                context_summary = intelligent_context.get("context_summary", "")
+                
+                # Build enhanced context with memory intelligence
+                enhanced_memory_context = self._build_intelligent_memory_context(
+                    relevant_memories, memory_insights, context_summary
+                )
+            else:
+                # Fallback to basic memory context for non-authenticated users
+                relevant_memories = request.context.get("relevant_memories", []) if request.context else []
+                enhanced_memory_context = self._build_memory_context(relevant_memories)
             
             # Search relevant documents for the user's question
             document_context = await self._search_relevant_documents(request.message, request.user_id)
@@ -55,14 +76,11 @@ class AgentService:
             # Get weather context if user has location data
             weather_context = await self._get_weather_context(request.context, request.message)
             
-            # Build enhanced context with memory, documents, and weather
-            memory_context = self._build_memory_context(relevant_memories)
-            
             # Build messages for LLM with memory, document, and weather context
             messages = AgentPrompts.build_messages(
                 user_message=request.message,
                 context=request.context,
-                memory_context=memory_context,
+                memory_context=enhanced_memory_context,
                 document_context=document_context,
                 weather_context=weather_context
             )
@@ -109,6 +127,55 @@ class AgentService:
                 memory_parts.append(f"{i}. {content} (relevance: {similarity:.2f})")
         
         return "\n".join(memory_parts) if len(memory_parts) > 1 else ""
+    
+    def _build_intelligent_memory_context(
+        self, 
+        relevant_memories: list, 
+        memory_insights: list, 
+        context_summary: str
+    ) -> str:
+        """
+        Build enhanced memory context with intelligence insights.
+        
+        Args:
+            relevant_memories: List of enhanced memory items
+            memory_insights: List of memory insights
+            context_summary: Summary of the context
+            
+        Returns:
+            Enhanced memory context string
+        """
+        if not relevant_memories and not memory_insights:
+            return ""
+        
+        context_parts = []
+        
+        # Add context summary if available
+        if context_summary:
+            context_parts.append(f"Context: {context_summary}")
+        
+        # Add relevant memories with enhanced information
+        if relevant_memories:
+            context_parts.append("Recent relevant conversations:")
+            for i, memory in enumerate(relevant_memories[:3], 1):
+                content = memory.get("content", "")
+                enhanced_relevance = memory.get("enhanced_relevance", 0)
+                memory_type = memory.get("memory_type", "general")
+                
+                if content and enhanced_relevance > 0.6:
+                    relevance_desc = "High" if enhanced_relevance > 0.8 else "Medium"
+                    context_parts.append(
+                        f"{i}. [{memory_type.title()}] {content} "
+                        f"(relevance: {relevance_desc})"
+                    )
+        
+        # Add key insights
+        if memory_insights:
+            context_parts.append("Key farming insights from your history:")
+            for insight in memory_insights[:2]:
+                context_parts.append(f"• {insight.topic}: {insight.summary}")
+        
+        return "\n".join(context_parts)
     
     async def _search_relevant_documents(self, query: str, user_id: Optional[str] = None) -> str:
         """
