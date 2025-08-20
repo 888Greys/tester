@@ -292,15 +292,41 @@ jobs:
         
         # Step 5: Health check with retry
         echo "🏥 Step 5: Health check..."
+        
+        # First check if container is running
+        echo "🔍 Checking container status..."
+        $SSH_CMD "docker ps -a --filter name=gukas-ai-agent"
+        
+        # Check container logs first
+        echo "📋 Initial container logs:"
+        $SSH_CMD "docker logs gukas-ai-agent --tail 30"
+        
+        # Wait a bit for startup
+        echo "⏳ Waiting 45 seconds for service startup..."
+        sleep 45
+        
         for i in {1..6}; do
           echo "🔍 Health check attempt $i..."
-          if $SSH_CMD "curl -f http://localhost:8001/health" 2>/dev/null; then
+          
+          # Check if container is still running
+          if ! $SSH_CMD "docker ps --filter name=gukas-ai-agent --filter status=running -q" | grep -q .; then
+            echo "❌ Container is not running!"
+            echo "📋 Container logs:"
+            $SSH_CMD "docker logs gukas-ai-agent --tail 50"
+            exit 1
+          fi
+          
+          # Try health check
+          if $SSH_CMD "curl -f -m 10 http://localhost:8001/health" 2>/dev/null; then
             echo "✅ Deployment successful!"
+            echo "🎉 Health check passed!"
             break
           elif [ $i -eq 6 ]; then
             echo "❌ Health check failed after 6 attempts"
-            echo "📋 Container logs:"
-            $SSH_CMD "docker logs gukas-ai-agent --tail 20"
+            echo "📋 Final container logs:"
+            $SSH_CMD "docker logs gukas-ai-agent --tail 50"
+            echo "🔍 Container inspect:"
+            $SSH_CMD "docker inspect gukas-ai-agent --format='{{.State.Status}}: {{.State.Error}}'"
             exit 1
           else
             echo "⏳ Waiting 15 seconds before retry..."

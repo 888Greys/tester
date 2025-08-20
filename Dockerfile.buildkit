@@ -43,6 +43,11 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 # Copy application code with proper ownership
 COPY --chown=appuser:appuser . .
 
+# Create necessary directories with proper permissions (as root)
+RUN mkdir -p uploads logs tmp && \
+    chown -R appuser:appuser uploads logs tmp && \
+    chmod 755 uploads logs tmp
+
 # Switch to non-root user
 USER appuser
 
