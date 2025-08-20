@@ -1,0 +1,50 @@
+services:
+  # Main Gukas AI Agent Application - Production Configuration
+  gukas-agent:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: gukas-ai-agent:production
+    container_name: gukas-ai-agent
+    ports:
+      - "8001:8001"
+    environment:
+      - CEREBRAS_API_KEY=${CEREBRAS_API_KEY}
+      - CEREBRAS_BASE_URL=${CEREBRAS_BASE_URL:-https://api.cerebras.ai/v1}
+      - CEREBRAS_MODEL=${CEREBRAS_MODEL:-gpt-oss-120b}
+      - DJANGO_BASE_URL=${DJANGO_BASE_URL}
+      - DJANGO_API_TOKEN=${DJANGO_API_TOKEN}
+      - DEBUG=${DEBUG:-false}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      # Database connections to existing production containers
+      - POSTGRES_HOST=localhost
+      - POSTGRES_PORT=5433
+      - POSTGRES_DB=${POSTGRES_DB:-gukas_memory}
+      - POSTGRES_USER=${POSTGRES_USER:-gukas_user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-gukas_password}
+      - QDRANT_HOST=localhost
+      - QDRANT_PORT=6333
+      - REDIS_HOST=localhost
+      - REDIS_PORT=6379
+      # Fix cache permissions for AI models
+      - TRANSFORMERS_CACHE=/tmp/transformers_cache
+      - HF_HOME=/tmp/huggingface_cache
+      - SENTENCE_TRANSFORMERS_HOME=/tmp/sentence_transformers_cache
+    env_file:
+      - .env
+    volumes:
+      # Mount for uploads and document storage
+      - uploads_data:/app/uploads
+    network_mode: "host"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import httpx; httpx.get('http://localhost:8001/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+# Named volumes for persistent data
+volumes:
+  uploads_data:
+    driver: local
