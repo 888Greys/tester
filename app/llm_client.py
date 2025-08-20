@@ -194,6 +194,69 @@ Remember: You are talking to ONE farmer about THEIR specific farm and challenges
         
         return messages
 
+    @staticmethod
+    def build_messages_with_history(
+        user_message: str,
+        conversation_history: Optional[List[Dict[str, Any]]] = None,
+        context: Optional[Dict[str, Any]] = None,
+        memory_context: Optional[str] = None,
+        document_context: Optional[str] = None,
+        weather_context: Optional[str] = None
+    ) -> List[Dict[str, str]]:
+        """
+        Build message list for LLM with conversation history and enhanced context.
+        
+        Args:
+            user_message: The farmer's current message
+            conversation_history: Previous messages in this session
+            context: Optional context information
+            memory_context: Optional memory context from previous conversations
+            document_context: Optional document context from knowledge base
+            weather_context: Optional current weather and forecast information
+            
+        Returns:
+            List of formatted messages for the LLM
+        """
+        messages = [
+            {"role": "system", "content": AgentPrompts.SYSTEM_PROMPT}
+        ]
+        
+        # Add weather context if provided (very relevant for farming decisions)
+        if weather_context:
+            weather_message = f"Current weather information for farming decisions:\n{weather_context}\n\nConsider this weather data when providing farming advice, especially for timing of activities."
+            messages.append({"role": "system", "content": weather_message})
+        
+        # Add document context if provided (highest priority for factual information)
+        if document_context:
+            doc_message = f"Relevant information from the coffee farming knowledge base:\n{document_context}\n\nUse this information to provide accurate, evidence-based advice."
+            messages.append({"role": "system", "content": doc_message})
+        
+        # Add memory context if provided
+        if memory_context:
+            memory_message = f"Relevant information from previous conversations:\n{memory_context}\n\nUse this context to provide more personalized and continuous assistance."
+            messages.append({"role": "system", "content": memory_message})
+        
+        # Add general context if provided
+        if context and context != {"relevant_memories": []}:
+            # Filter out memory context to avoid duplication
+            filtered_context = {k: v for k, v in context.items() if k != "relevant_memories"}
+            if filtered_context:
+                context_message = f"Additional context: {filtered_context}"
+                messages.append({"role": "system", "content": context_message})
+        
+        # Add conversation history from this session (maintain conversation flow)
+        if conversation_history:
+            for msg in conversation_history[-6:]:  # Last 6 messages for context
+                role = "user" if msg.get("message_type") == "user" else "assistant"
+                content = msg.get("content", "")
+                if content and content != user_message:  # Don't duplicate current message
+                    messages.append({"role": role, "content": content})
+        
+        # Add current user message
+        messages.append({"role": "user", "content": user_message})
+        
+        return messages
+
 
 # Global client instance
 cerebras_client = CerebrasClient()

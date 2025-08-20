@@ -76,9 +76,19 @@ class AgentService:
             # Get weather context if user has location data
             weather_context = await self._get_weather_context(request.context, request.message)
             
-            # Build messages for LLM with memory, document, and weather context
-            messages = AgentPrompts.build_messages(
+            # Get conversation history for this session to maintain context continuity
+            conversation_history = []
+            if request.user_id:
+                from app.services.memory import memory_service
+                conversation_history = await memory_service.get_conversation_history(
+                    session_id=session_id,
+                    limit=10  # Get last 10 messages for context
+                )
+            
+            # Build messages for LLM with conversation history, memory, document, and weather context
+            messages = AgentPrompts.build_messages_with_history(
                 user_message=request.message,
+                conversation_history=conversation_history,
                 context=request.context,
                 memory_context=enhanced_memory_context,
                 document_context=document_context,
