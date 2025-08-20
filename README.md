@@ -191,9 +191,17 @@ user_service.py        # Profile synchronization with Django backend
 ```
 
 ### **API Endpoints**
+
+#### **Core Chat & Intelligence**
 - `POST /chat` - Main conversation endpoint with RAG integration
 - `GET /conversations/{user_id}` - Conversation history retrieval
 - `POST /documents/upload` - Document upload to knowledge base
+
+#### **Disease Detection**
+- `POST /disease/predict` - Upload image for coffee disease detection (supports JPG, PNG)
+- `GET /disease/health` - Disease detection service health status
+
+#### **System Health**
 - `GET /health` - System health and readiness checks
 - `GET /docs` - Swagger API documentation
 
@@ -956,6 +964,22 @@ Invoke-RestMethod -Uri "http://localhost:8001/api/user/context/sync" -Method Pos
 Invoke-RestMethod -Uri "http://localhost:8001/info"
 ```
 
+#### **Disease Detection Test**
+```powershell
+# Test disease detection health
+Invoke-RestMethod -Uri "http://localhost:8001/disease/health"
+
+# Test disease prediction with image upload (PowerShell)
+$imagePath = "C:\path\to\coffee_leaf.jpg"
+$uri = "http://localhost:8001/disease/predict"
+
+$form = @{
+    file = Get-Item -Path $imagePath
+}
+
+Invoke-RestMethod -Uri $uri -Method Post -Form $form
+```
+
 #### **cURL Testing Commands**
 
 ```bash
@@ -1032,6 +1056,30 @@ curl -X POST http://localhost:8001/api/user/context/sync \
     },
     "sync_type": "login"
   }'
+
+# Disease detection health check
+curl http://localhost:8001/disease/health
+
+# Disease prediction with image upload
+curl -X POST http://localhost:8001/disease/predict \
+  -F "file=@/path/to/coffee_leaf.jpg"
+
+# Expected response format for disease prediction:
+# {
+#   "success": true,
+#   "prediction": {
+#     "disease": "Healthy",
+#     "confidence": 0.95,
+#     "all_predictions": {
+#       "Healthy": 0.95,
+#       "Coffee_Leaf_Rust": 0.03,
+#       "Coffee_Berry_Disease": 0.01,
+#       "Phoma": 0.005,
+#       "Cercospora": 0.005
+#     }
+#   },
+#   "model_loaded": true
+# }
 ```
 
 ## 🧪 **Testing**
