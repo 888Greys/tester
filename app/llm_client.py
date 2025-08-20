@@ -247,8 +247,15 @@ Remember: You are talking to ONE farmer about THEIR specific farm and challenges
         # Add conversation history from this session (maintain conversation flow)
         if conversation_history:
             for msg in conversation_history[-6:]:  # Last 6 messages for context
-                role = "user" if msg.get("message_type") == "user" else "assistant"
-                content = msg.get("content", "")
+                try:
+                    # Try ConversationMessage object attributes first
+                    role = "user" if msg.message_type == "user" else "assistant"
+                    content = msg.content
+                except AttributeError:
+                    # Fall back to dictionary access
+                    role = "user" if msg.get("message_type") == "user" else "assistant"
+                    content = msg.get("content", "")
+                
                 if content and content != user_message:  # Don't duplicate current message
                     messages.append({"role": role, "content": content})
         
