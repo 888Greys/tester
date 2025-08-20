@@ -69,9 +69,11 @@ class DiseaseDetectionService:
         try:
             # Look for model file in different possible locations
             model_paths = [
-                '/Users/pompompurin/Desktop/Guka/guka-ai-agent/models/resnext50_32x4d_fold1_best.pth',
-                '/Users/pompompurin/Desktop/Guka/gukas-backend/apps/detection/trained_model/resnext50_32x4d_fold1_best.pth',
-                '/Users/pompompurin/Desktop/Guka/guka-ai-agent/Coffee_Disease_Detection/trained_model/resnext50_32x4d_fold1_best.pth'
+                '/app/models/resnext50_32x4d_fold1_best.pth',  # Container path
+                './models/resnext50_32x4d_fold1_best.pth',   # Relative container path
+                'models/resnext50_32x4d_fold1_best.pth',     # Simple relative path
+                '/Users/pompompurin/Desktop/Guka/guka-ai-agent/models/resnext50_32x4d_fold1_best.pth',  # Local dev path
+                '/Users/pompompurin/Desktop/Guka/gukas-backend/apps/detection/trained_model/resnext50_32x4d_fold1_best.pth'  # Backend path
             ]
             
             model_path = None
