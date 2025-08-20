@@ -12,7 +12,7 @@ import time
 from typing import List, Dict, Any
 
 # Configuration
-AGENT_URL = "http://localhost:8002"
+AGENT_URL = "http://localhost:8001"
 DOCUMENTS_FOLDER = "documents"
 SUPPORTED_EXTENSIONS = ['.pdf', '.docx', '.txt']
 
